@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Администратор - Система распределения</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Система распределения студентов в общежития</h1>
+            <div class="user-info">
+                <span id="userName"></span>
+                <button onclick="logout()">Выйти</button>
+            </div>
+        </header>
+        
+        <nav>
+            <ul>
+                <li><a href="#" onclick="showSection('applications')">Заявки</a></li>
+                <li><a href="#" onclick="showSection('residents')">Проживающие</a></li>
+                <li><a href="#" onclick="showSection('dormitories')">Общежития</a></li>
+                <li><a href="#" onclick="showSection('reports')">Отчеты</a></li>
+            </ul>
+        </nav>
+        
+        <main>
+            <div id="applicationsSection" class="section">
+                <h2>Заявки на размещение</h2>
+                <div class="filters">
+                    <select id="applicationFilter" onchange="loadApplications()">
+                        <option value="all">Все заявки</option>
+                        <option value="pending">Ожидающие</option>
+                        <option value="approved">Одобренные</option>
+                        <option value="rejected">Отклоненные</option>
+                    </select>
+                </div>
+                <div id="applicationsList"></div>
+            </div>
+            
+            <div id="residentsSection" class="section" style="display: none;">
+                <h2>Проживающие студенты</h2>
+                <div id="residentsList"></div>
+            </div>
+            
+            <div id="dormitoriesSection" class="section" style="display: none;">
+                <h2>Информация об общежитиях</h2>
+                <div id="dormitoriesList"></div>
+            </div>
+            
+            <div id="reportsSection" class="section" style="display: none;">
+                <h2>Отчеты</h2>
+                <div class="report-actions">
+                    <button onclick="generateVacancyReport()">Отчет о свободных местах</button>
+                    <button onclick="generateQueueReport()">Отчет об очереди</button>
+                </div>
+                <div id="reportOutput"></div>
+            </div>
+            
+            <!-- Модальное окно для заселения -->
+            <div id="checkInModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <span class="close" onclick="closeModal('checkInModal')">&times;</span>
+                    <h3>Заселение студента</h3>
+                    <form id="checkInForm">
+                        <input type="hidden" id="checkInApplicationId">
+                        <div class="form-group">
+                            <label for="checkInDormitory">Общежитие:</label>
+                            <select id="checkInDormitory" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="checkInRoom">Номер комнаты:</label>
+                            <input type="text" id="checkInRoom" required>
+                        </div>
+                        <button type="submit">Заселить</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div id="message" class="message"></div>
+        </main>
+        
+        <footer>
+            <p></p>
+        </footer>
+    </div>
+    
+    <script src="js/admin.js"></script>
+</body>
+</html>

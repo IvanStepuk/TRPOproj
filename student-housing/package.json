@@ -1,0 +1,23 @@
+{
+  "name": "student-housing",
+  "version": "1.0.0",
+  "description": "Система распределения студентов в общежития",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.3",
+    "express": "^4.21.2",
+    "sqlite3": "^5.1.7"
+  },
+  "keywords": [
+    "student",
+    "housing",
+    "dormitory"
+  ],
+  "author": "University",
+  "license": "MIT"
+}

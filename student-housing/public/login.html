@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авторизация - Система распределения студентов</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Система распределения студентов в общежития</h1>
+        </header>
+        
+        <main>
+            <div class="auth-container">
+                <div class="auth-form" id="loginForm">
+                    <h2>Вход в систему</h2>
+                    <form id="loginFormElement">
+                        <div class="form-group">
+                            <label for="username">Логин:</label>
+                            <input type="text" id="username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Пароль:</label>
+                            <input type="password" id="password" name="password" required>
+                        </div>
+                        <button type="submit">Войти</button>
+                    </form>
+                    <p>Нет аккаунта? <a href="#" onclick="showRegister()">Зарегистрироваться</a></p>
+                </div>
+                
+                <div class="auth-form" id="registerForm" style="display: none;">
+                    <h2>Регистрация</h2>
+                    <form id="registerFormElement">
+                        <div class="form-group">
+                            <label for="regUsername">Логин:</label>
+                            <input type="text" id="regUsername" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regPassword">Пароль:</label>
+                            <input type="password" id="regPassword" name="password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="fullName">ФИО:</label>
+                            <input type="text" id="fullName" name="full_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email:</label>
+                            <input type="email" id="email" name="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">Телефон:</label>
+                            <input type="tel" id="phone" name="phone">
+                        </div>
+                        <button type="submit">Зарегистрироваться</button>
+                    </form>
+                    <p>Уже есть аккаунт? <a href="#" onclick="showLogin()">Войти</a></p>
+                </div>
+                
+                <div id="message" class="message"></div>
+            </div>
+        </main>
+        
+        <footer>
+            <p></p>
+        </footer>
+    </div>
+    
+    <script src="js/auth.js"></script>
+</body>
+</html>
