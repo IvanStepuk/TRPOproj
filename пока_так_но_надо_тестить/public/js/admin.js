@@ -126,7 +126,6 @@ function displayStudents(students) {
             <p><strong>Средний балл:</strong> ${student.average_grade}</p>
             <p><strong>Общественная нагрузка:</strong> ${student.social_activity ? 'Да' : 'Нет'}</p>
             ${student.dormitory_name ? `<p><strong>Общежитие:</strong> ${student.dormitory_name}</p>` : ''}
-            ${student.room_number ? `<p><strong>Комната:</strong> ${student.room_number}</p>` : ''}
             ${student.queue_position ? `<p><strong>Позиция в очереди:</strong> ${student.queue_position}</p>` : ''}
             
             <div class="student-actions">
@@ -173,7 +172,6 @@ function handleAccommodation(e) {
     
     const studentId = document.getElementById('accommodateStudentId').value;
     const dormitoryId = document.getElementById('dormitorySelect').value;
-    const roomNumber = document.getElementById('roomNumber').value;
     
     fetch(`/api/students/${studentId}/accommodate`, {
         method: 'POST',
@@ -181,8 +179,7 @@ function handleAccommodation(e) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            dormitory_id: dormitoryId,
-            room_number: roomNumber
+            dormitory_id: dormitoryId
         })
     })
     .then(response => response.json())

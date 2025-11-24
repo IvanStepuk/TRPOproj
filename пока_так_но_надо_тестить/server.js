@@ -233,10 +233,10 @@ app.post('/api/students', (req, res) => {
 // Заселение студента
 app.post('/api/students/:id/accommodate', (req, res) => {
     const studentId = req.params.id;
-    const { dormitory_id, room_number } = req.body;
+    const { dormitory_id } = req.body;
     
-    if (!dormitory_id || !room_number) {
-        return res.status(400).json({ error: 'Необходимо указать общежитие и номер комнаты' });
+    if (!dormitory_id) {
+        return res.status(400).json({ error: 'Необходимо указать общежитие' });
     }
     
     // Проверяем, есть ли свободные места
@@ -256,8 +256,8 @@ app.post('/api/students/:id/accommodate', (req, res) => {
         
         // Обновляем статус студента и занимаем место
         db.serialize(() => {
-            db.run("UPDATE students SET status = 'accommodated', dormitory_id = ?, room_number = ? WHERE id = ?", 
-                   [dormitory_id, room_number, studentId]);
+            db.run("UPDATE students SET status = 'accommodated', dormitory_id = ? WHERE id = ?", 
+                   [dormitory_id, studentId]);
             
             db.run("UPDATE dormitories SET occupied_places = occupied_places + 1 WHERE id = ?", [dormitory_id]);
             
@@ -286,7 +286,7 @@ app.post('/api/students/:id/evict', (req, res) => {
                 db.run("UPDATE dormitories SET occupied_places = occupied_places - 1 WHERE id = ?", [student.dormitory_id]);
             }
             
-            db.run("UPDATE students SET status = 'waiting', dormitory_id = NULL, room_number = NULL WHERE id = ?", [studentId]);
+            db.run("UPDATE students SET status = 'waiting', dormitory_id = NULL WHERE id = ?", [studentId]);
             
             res.json({ success: true, message: 'Студент успешно выселен' });
         });

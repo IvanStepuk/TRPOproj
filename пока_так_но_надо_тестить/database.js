@@ -43,7 +43,6 @@ function initializeDatabase() {
         application_date DATE DEFAULT CURRENT_DATE,
         status TEXT CHECK(status IN ('waiting', 'accommodated')) DEFAULT 'waiting',
         dormitory_id INTEGER,
-        room_number TEXT,
         FOREIGN KEY (dormitory_id) REFERENCES dormitories (id)
     )`);
 

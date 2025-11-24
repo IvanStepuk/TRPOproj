@@ -37,7 +37,6 @@ function displayStudents(students) {
             <p><strong>Средний балл:</strong> ${student.average_grade}</p>
             <p><strong>Общественная нагрузка:</strong> ${student.social_activity ? 'Да' : 'Нет'}</p>
             ${student.dormitory_name ? `<p><strong>Общежитие:</strong> ${student.dormitory_name}</p>` : ''}
-            ${student.room_number ? `<p><strong>Комната:</strong> ${student.room_number}</p>` : ''}
             ${student.queue_position ? `<p><strong>Позиция в очереди:</strong> ${student.queue_position}</p>` : ''}
         </div>
     `).join('');
