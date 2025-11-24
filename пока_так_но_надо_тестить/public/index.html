@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система распределения студентов - Публичный доступ</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Система распределения студентов в общежитиях</h1>
+            <nav>
+                <a href="/admin">Вход для администратора</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="search-section">
+                <h2>Поиск студентов</h2>
+                <div class="search-form">
+                    <input type="text" id="searchInput" placeholder="Введите ФИО студента...">
+                    <button onclick="searchStudents()">Найти</button>
+                    <button onclick="clearSearch()">Показать всех</button>
+                </div>
+            </section>
+
+            <section class="students-section">
+                <h2>Список студентов</h2>
+                <div id="studentsList" class="students-list">
+                    <!-- Список студентов будет загружен здесь -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

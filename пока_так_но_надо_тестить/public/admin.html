@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система распределения студентов - Администратор</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Система распределения студентов - Панель администратора</h1>
+            <nav>
+                <a href="/">Публичный доступ</a>
+                <button id="logoutBtn" style="display: none;">Выйти</button>
+            </nav>
+        </header>
+
+        <div id="loginSection" class="login-section">
+            <h2>Авторизация</h2>
+            <form id="loginForm">
+                <input type="text" id="username" placeholder="Имя пользователя" required>
+                <input type="password" id="password" placeholder="Пароль" required>
+                <button type="submit">Войти</button>
+            </form>
+        </div>
+
+        <div id="adminPanel" class="admin-panel" style="display: none;">
+            <nav class="admin-nav">
+                <button onclick="showSection('students')">Управление студентами</button>
+                <button onclick="showSection('applications')">Регистрация заявок</button>
+                <button onclick="showSection('reports')">Отчеты</button>
+            </nav>
+
+            <!-- Секция управления студентами -->
+            <section id="studentsSection" class="section">
+                <h2>Управление студентами</h2>
+                <div class="controls">
+                    <button onclick="loadNextCandidate()">Следующий кандидат для заселения</button>
+                </div>
+                <div id="studentsList" class="students-list">
+                    <!-- Список студентов будет загружен здесь -->
+                </div>
+            </section>
+
+            <!-- Секция регистрации заявок -->
+            <section id="applicationsSection" class="section" style="display: none;">
+                <h2>Регистрация новой заявки</h2>
+                <form id="applicationForm">
+                    <input type="text" id="fullName" placeholder="ФИО студента" required>
+                    <input type="number" id="familyIncome" placeholder="Доход семьи" step="0.01" required>
+                    <input type="number" id="familyMembers" placeholder="Количество членов семьи" required>
+                    <input type="number" id="averageGrade" placeholder="Средний балл (0-10)" min="0" max="10" step="0.1" required>
+                    <label>
+                        <input type="checkbox" id="socialActivity">
+                        Общественная нагрузка
+                    </label>
+                    <button type="submit">Зарегистрировать заявку</button>
+                </form>
+            </section>
+
+            <!-- Секция отчетов -->
+            <section id="reportsSection" class="section" style="display: none;">
+                <h2>Отчеты</h2>
+                <div class="report-controls">
+                    <button onclick="loadFreePlacesReport()">Свободные места</button>
+                    <button onclick="loadQueueReport()">Очередь на заселение</button>
+                </div>
+                <div id="reportResults">
+                    <!-- Результаты отчетов будут отображаться здесь -->
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Модальное окно для заселения -->
+    <div id="accommodateModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Заселение студента</h3>
+            <form id="accommodateForm">
+                <input type="hidden" id="accommodateStudentId">
+                <div>
+                    <label>Общежитие:</label>
+                    <select id="dormitorySelect" required>
+                        <option value="">Выберите общежитие</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Номер комнаты:</label>
+                    <input type="text" id="roomNumber" required>
+                </div>
+                <button type="submit">Заселить</button>
+                <button type="button" onclick="closeModal()">Отмена</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>
