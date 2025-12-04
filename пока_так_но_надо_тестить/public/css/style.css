@@ -71,6 +71,7 @@ button {
     color: white;
     border: none;
     cursor: pointer;
+    transition: background-color 0.3s;
 }
 
 button:hover {
@@ -174,4 +175,192 @@ button:hover {
 
 .controls {
     margin-bottom: 1rem;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.export-buttons button {
+    padding: 8px 16px;
+    font-size: 0.9em;
+}
+
+.export-buttons button:nth-child(1) {
+    background: #2ecc71;
+}
+
+.export-buttons button:nth-child(1):hover {
+    background: #27ae60;
+}
+
+.export-buttons button:nth-child(2) {
+    background: #3498db;
+}
+
+.export-buttons button:nth-child(2):hover {
+    background: #2980b9;
+}
+/* Стили для кнопок экспорта */
+.export-buttons {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.export-buttons button {
+    padding: 8px 16px;
+    font-size: 0.9em;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.export-buttons button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.export-buttons button:nth-child(1) {
+    background: linear-gradient(to right, #2ecc71, #27ae60);
+    color: white;
+}
+
+.export-buttons button:nth-child(2) {
+    background: linear-gradient(to right, #3498db, #2980b9);
+    color: white;
+}
+
+.export-section {
+    margin: 20px 0;
+    padding: 15px;
+    border-radius: 8px;
+    background: linear-gradient(to right, #f8f9fa, #e9ecef);
+    border: 1px solid #dee2e6;
+}
+
+.export-section h3 {
+    margin-top: 0;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.export-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.export-card {
+    border: 1px solid #e0e0e0;
+    padding: 15px;
+    border-radius: 6px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.export-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.export-card h4 {
+    margin-top: 0;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 5px;
+}
+
+.export-card p {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 10px;
+    min-height: 40px;
+}
+
+.export-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.export-btn {
+    padding: 8px 12px;
+    font-size: 0.85em;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 80px;
+}
+
+.export-btn.txt {
+    background: linear-gradient(to right, #2ecc71, #27ae60);
+    color: white;
+}
+
+.export-btn.docx {
+    background: linear-gradient(to right, #3498db, #2980b9);
+    color: white;
+}
+
+.export-btn:hover {
+    opacity: 0.9;
+    transform: scale(1.05);
+}
+
+/* Стили для секции быстрого экспорта */
+.quick-export {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.quick-export h3 {
+    color: white;
+    margin-top: 0;
+}
+
+.quick-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.quick-btn {
+    padding: 12px 20px;
+    font-size: 1em;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid white;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quick-btn:hover {
+    background: white;
+    color: #667eea;
+    transform: translateY(-2px);
 }

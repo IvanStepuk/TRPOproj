@@ -1,13 +1,11 @@
+
 let currentSession = null;
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    // Проверяем, есть ли сохраненная сессия
-    const savedSession = localStorage.getItem('adminSession');
-    if (savedSession) {
-        currentSession = JSON.parse(savedSession);
-        showAdminPanel();
-    }
+    // Убираем автоматическую проверку сохраненной сессии
+    // Пользователь должен всегда входить через форму авторизации
+    showLoginForm();
     
     // Обработчик формы авторизации
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
@@ -22,12 +20,25 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
 });
 
+// Показать форму авторизации
+function showLoginForm() {
+    document.getElementById('loginSection').style.display = 'block';
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('logoutBtn').style.display = 'none';
+}
+
 // Обработка авторизации
 function handleLogin(e) {
     e.preventDefault();
     
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
+    
+    // Проверка на пустые поля
+    if (!username || !password) {
+        alert('Пожалуйста, введите имя пользователя и пароль');
+        return;
+    }
     
     fetch('/api/login', {
         method: 'POST',
@@ -47,11 +58,13 @@ function handleLogin(e) {
             showAdminPanel();
         } else {
             alert('Ошибка авторизации: ' + data.error);
+            document.getElementById('password').value = ''; // Очищаем пароль
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
         alert('Ошибка при авторизации');
+        document.getElementById('password').value = ''; // Очищаем пароль
     });
 }
 
@@ -60,6 +73,9 @@ function showAdminPanel() {
     document.getElementById('loginSection').style.display = 'none';
     document.getElementById('adminPanel').style.display = 'block';
     document.getElementById('logoutBtn').style.display = 'block';
+    
+    // Очищаем форму авторизации
+    document.getElementById('loginForm').reset();
     
     // Загружаем начальные данные
     showSection('students');
@@ -70,9 +86,7 @@ function showAdminPanel() {
 function handleLogout() {
     currentSession = null;
     localStorage.removeItem('adminSession');
-    document.getElementById('loginSection').style.display = 'block';
-    document.getElementById('adminPanel').style.display = 'none';
-    document.getElementById('logoutBtn').style.display = 'none';
+    showLoginForm();
 }
 
 // Переключение между секциями
@@ -156,6 +170,9 @@ function loadDormitories() {
 
 // Открытие модального окна для заселения
 function openAccommodateModal(studentId) {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
     document.getElementById('accommodateStudentId').value = studentId;
     document.getElementById('accommodateModal').style.display = 'flex';
     loadDormitories(); // Обновляем список общежитий
@@ -166,12 +183,30 @@ function closeModal() {
     document.getElementById('accommodateModal').style.display = 'none';
 }
 
+// Проверка авторизации
+function checkAuth() {
+    if (!currentSession) {
+        alert('Для выполнения этого действия необходимо авторизоваться');
+        showLoginForm();
+        return false;
+    }
+    return true;
+}
+
 // Обработка заселения студента
 function handleAccommodation(e) {
     e.preventDefault();
     
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
     const studentId = document.getElementById('accommodateStudentId').value;
     const dormitoryId = document.getElementById('dormitorySelect').value;
+    
+    if (!dormitoryId) {
+        alert('Пожалуйста, выберите общежитие');
+        return;
+    }
     
     fetch(`/api/students/${studentId}/accommodate`, {
         method: 'POST',
@@ -200,6 +235,9 @@ function handleAccommodation(e) {
 
 // Выселение студента
 function evictStudent(studentId) {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
     if (!confirm('Вы уверены, что хотите выселить этого студента?')) {
         return;
     }
@@ -224,6 +262,9 @@ function evictStudent(studentId) {
 
 // Загрузка следующего кандидата для заселения
 function loadNextCandidate() {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
     fetch('/api/students/next-candidate')
         .then(response => response.json())
         .then(student => {
@@ -243,6 +284,9 @@ function loadNextCandidate() {
 function handleApplication(e) {
     e.preventDefault();
     
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
     const formData = new FormData(e.target);
     const application = {
         full_name: document.getElementById('fullName').value,
@@ -251,6 +295,17 @@ function handleApplication(e) {
         average_grade: parseFloat(document.getElementById('averageGrade').value),
         social_activity: document.getElementById('socialActivity').checked
     };
+    
+    // Валидация данных
+    if (!application.full_name || !application.family_income || !application.family_members || !application.average_grade) {
+        alert('Пожалуйста, заполните все обязательные поля');
+        return;
+    }
+    
+    if (application.average_grade < 0 || application.average_grade > 10) {
+        alert('Средний балл должен быть в диапазоне от 0 до 10');
+        return;
+    }
     
     fetch('/api/students', {
         method: 'POST',
@@ -276,6 +331,9 @@ function handleApplication(e) {
 
 // Загрузка отчета о свободных местах
 function loadFreePlacesReport() {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
     fetch('/api/reports/free-places')
         .then(response => response.json())
         .then(data => {
@@ -289,6 +347,9 @@ function loadFreePlacesReport() {
 
 // Загрузка отчета об очереди
 function loadQueueReport() {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
     fetch('/api/reports/queue')
         .then(response => response.json())
         .then(data => {
