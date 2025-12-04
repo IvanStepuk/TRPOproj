@@ -1,4 +1,3 @@
-
 let currentSession = null;
 
 // Инициализация при загрузке страницы
@@ -107,6 +106,9 @@ function showSection(sectionName) {
         case 'reports':
             // Очищаем результаты отчетов
             document.getElementById('reportResults').innerHTML = '';
+            break;
+        case 'export':
+            loadExportStats();
             break;
     }
 }
@@ -361,6 +363,22 @@ function loadQueueReport() {
         });
 }
 
+// Загрузка отчета о заселенных студентах
+function loadAccommodatedReport() {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
+    fetch('/api/reports/accommodated')
+        .then(response => response.json())
+        .then(data => {
+            displayReport(data, 'accommodated');
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            alert('Ошибка при загрузке отчета');
+        });
+}
+
 // Отображение отчетов
 function displayReport(data, reportType) {
     const container = document.getElementById('reportResults');
@@ -372,59 +390,317 @@ function displayReport(data, reportType) {
     
     let tableHTML = '';
     
-    if (reportType === 'free-places') {
-        tableHTML = `
-            <table class="report-table">
-                <thead>
-                    <tr>
-                        <th>Общежитие</th>
-                        <th>Тип</th>
-                        <th>Всего мест</th>
-                        <th>Занято</th>
-                        <th>Свободно</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${data.map(row => `
+    switch(reportType) {
+        case 'free-places':
+            tableHTML = `
+                <div class="export-buttons">
+                    <button onclick="exportReport('free-places', 'txt')">📝 Экспорт в TXT</button>
+                    <button onclick="exportReport('free-places', 'docx')">📄 Экспорт в DOCX</button>
+                </div>
+                <table class="report-table">
+                    <thead>
                         <tr>
-                            <td>${row.name}</td>
-                            <td>${row.type === 'family' ? 'Семейное' : 'Несемейное'}</td>
-                            <td>${row.total_places}</td>
-                            <td>${row.occupied_places}</td>
-                            <td>${row.free_places}</td>
+                            <th>Общежитие</th>
+                            <th>Тип</th>
+                            <th>Всего мест</th>
+                            <th>Занято</th>
+                            <th>Свободно</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-    } else if (reportType === 'queue') {
-        tableHTML = `
-            <table class="report-table">
-                <thead>
-                    <tr>
-                        <th>Позиция</th>
-                        <th>ФИО</th>
-                        <th>Доход на члена семьи</th>
-                        <th>Средний балл</th>
-                        <th>Общественная нагрузка</th>
-                        <th>Дата заявки</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${data.map(row => `
+                    </thead>
+                    <tbody>
+                        ${data.map(row => `
+                            <tr>
+                                <td>${row.name}</td>
+                                <td>${row.type === 'family' ? 'Семейное' : 'Несемейное'}</td>
+                                <td>${row.total_places}</td>
+                                <td>${row.occupied_places}</td>
+                                <td>${row.free_places}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            break;
+            
+        case 'queue':
+            tableHTML = `
+                <div class="export-buttons">
+                    <button onclick="exportReport('queue', 'txt')">📝 Экспорт в TXT</button>
+                    <button onclick="exportReport('queue', 'docx')">📄 Экспорт в DOCX</button>
+                </div>
+                <table class="report-table">
+                    <thead>
                         <tr>
-                            <td>${row.queue_position}</td>
-                            <td>${row.full_name}</td>
-                            <td>${row.income_per_member.toFixed(2)}</td>
-                            <td>${row.average_grade}</td>
-                            <td>${row.social_activity ? 'Да' : 'Нет'}</td>
-                            <td>${new Date(row.application_date).toLocaleDateString()}</td>
+                            <th>Позиция</th>
+                            <th>ФИО</th>
+                            <th>Доход на члена семьи</th>
+                            <th>Средний балл</th>
+                            <th>Общественная нагрузка</th>
+                            <th>Дата заявки</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
+                    </thead>
+                    <tbody>
+                        ${data.map(row => `
+                            <tr>
+                                <td>${row.queue_position}</td>
+                                <td>${row.full_name}</td>
+                                <td>${row.income_per_member.toFixed(2)}</td>
+                                <td>${row.average_grade}</td>
+                                <td>${row.social_activity ? 'Да' : 'Нет'}</td>
+                                <td>${new Date(row.application_date).toLocaleDateString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            break;
+            
+        case 'accommodated':
+            tableHTML = `
+                <div class="export-buttons">
+                    <button onclick="exportReport('accommodated', 'txt')">📝 Экспорт в TXT</button>
+                    <button onclick="exportReport('accommodated', 'docx')">📄 Экспорт в DOCX</button>
+                </div>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>ФИО</th>
+                            <th>Средний балл</th>
+                            <th>Общественная нагрузка</th>
+                            <th>Дата заявки</th>
+                            <th>Общежитие</th>
+                            <th>Тип общежития</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(row => `
+                            <tr>
+                                <td>${row.full_name}</td>
+                                <td>${row.average_grade}</td>
+                                <td>${row.social_activity ? 'Да' : 'Нет'}</td>
+                                <td>${new Date(row.application_date).toLocaleDateString()}</td>
+                                <td>${row.dormitory_name || 'Нет'}</td>
+                                <td>${row.dormitory_type === 'family' ? 'Семейное' : 'Несемейное'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            break;
     }
     
     container.innerHTML = tableHTML;
 }
+
+// ============================
+// ФУНКЦИИ ЭКСПОРТА
+// ============================
+
+// Экспорт отчета
+function exportReport(reportType, format) {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
+    // Показываем уведомление о начале экспорта
+    showExportNotification(`Начинается экспорт отчета "${getReportName(reportType)}" в формате ${format.toUpperCase()}...`);
+    
+    // Создаем URL для экспорта
+    const url = `/api/export/${reportType}/${format}`;
+    
+    // Скачиваем файл
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `report_${reportType}_${new Date().toISOString().slice(0,10)}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    // Показываем уведомление об успешном экспорте
+    setTimeout(() => {
+        showExportNotification(`✅ Отчет "${getReportName(reportType)}" успешно экспортирован в формате ${format.toUpperCase()}!`, 'success');
+    }, 500);
+}
+
+// Экспорт всех отчетов
+function exportAllReports(format) {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
+    // Показываем уведомление о начале экспорта
+    showExportNotification(`Начинается экспорт всех отчетов в формате ${format.toUpperCase()}...`);
+    
+    // Создаем URL для экспорта
+    const url = `/api/export/all/${format}`;
+    
+    // Скачиваем файл
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `all_reports_${new Date().toISOString().slice(0,10)}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    // Показываем уведомление об успешном экспорте
+    setTimeout(() => {
+        showExportNotification(`✅ Все отчеты успешно экспортированы в формате ${format.toUpperCase()}!`, 'success');
+    }, 500);
+}
+
+// Получение названия отчета по типу
+function getReportName(reportType) {
+    const names = {
+        'free-places': 'Свободные места в общежитиях',
+        'queue': 'Очередь на заселение',
+        'accommodated': 'Заселенные студенты',
+        'all': 'Все отчеты'
+    };
+    return names[reportType] || reportType;
+}
+
+// Показ уведомления об экспорте
+function showExportNotification(message, type = 'info') {
+    // Создаем элемент уведомления
+    const notification = document.createElement('div');
+    notification.className = `export-notification ${type}`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: ${type === 'success' ? '#2ecc71' : '#3498db'};
+        color: white;
+        border-radius: 5px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        max-width: 400px;
+    `;
+    
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Удаляем уведомление через 3 секунды
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Загрузка статистики для экспорта
+function loadExportStats() {
+    // Проверяем авторизацию
+    if (!checkAuth()) return;
+    
+    // Используем несколько запросов для получения статистики
+    Promise.all([
+        fetch('/api/students').then(r => r.json()),
+        fetch('/api/dormitories').then(r => r.json()),
+        fetch('/api/reports/queue').then(r => r.json()),
+        fetch('/api/reports/accommodated').then(r => r.json())
+    ])
+    .then(([students, dormitories, queue, accommodated]) => {
+        const totalStudents = students.length;
+        const waitingStudents = queue.length;
+        const accommodatedStudents = accommodated.length;
+        
+        // Рассчитываем общую статистику по общежитиям
+        let totalPlaces = 0;
+        let occupiedPlaces = 0;
+        let freePlaces = 0;
+        
+        dormitories.forEach(dorm => {
+            totalPlaces += dorm.total_places;
+            occupiedPlaces += dorm.occupied_places;
+            freePlaces += (dorm.total_places - dorm.occupied_places);
+        });
+        
+        // Отображаем статистику
+        const statsHTML = `
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Всего студентов</div>
+                    <div class="stat-value">${totalStudents}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">В очереди</div>
+                    <div class="stat-value">${waitingStudents}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Заселено</div>
+                    <div class="stat-value">${accommodatedStudents}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Всего мест</div>
+                    <div class="stat-value">${totalPlaces}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Занято мест</div>
+                    <div class="stat-value">${occupiedPlaces}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Свободно мест</div>
+                    <div class="stat-value">${freePlaces}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Общежитий</div>
+                    <div class="stat-value">${dormitories.length}</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                <p><strong>Последний экспорт:</strong> <span id="lastExportTime">Нет данных</span></p>
+                <p><strong>Готово к экспорту:</strong> ${totalStudents} записей</p>
+                <p><strong>Рекомендуемый формат:</strong> Для анализа данных используйте TXT, для печати - DOCX</p>
+            </div>
+        `;
+        
+        document.getElementById('statsContent').innerHTML = statsHTML;
+        
+        // Обновляем время последнего экспорта
+        const lastExport = localStorage.getItem('lastExport');
+        if (lastExport) {
+            document.getElementById('lastExportTime').textContent = 
+                new Date(lastExport).toLocaleString();
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка при загрузке статистики:', error);
+        document.getElementById('statsContent').innerHTML = 
+            '<p>Ошибка при загрузке статистики. Пожалуйста, попробуйте позже.</p>';
+    });
+}
+
+// Добавляем стили для анимаций уведомлений
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(style);
