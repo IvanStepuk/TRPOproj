@@ -1,9 +1,8 @@
 let currentSession = null;
+let currentFilter = 'all'; // all, accommodated, waiting
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    // Убираем автоматическую проверку сохраненной сессии
-    // Пользователь должен всегда входить через форму авторизации
     showLoginForm();
     
     // Обработчик формы авторизации
@@ -17,6 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Обработчик выхода
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    
+    // Обработчик изменения фильтра
+    document.getElementById('studentFilter').addEventListener('change', function() {
+        setFilter(this.value);
+    });
 });
 
 // Показать форму авторизации
@@ -115,14 +119,36 @@ function showSection(sectionName) {
 
 // Загрузка списка студентов
 function loadStudents() {
-    fetch('/api/students')
+    let url = '/api/students';
+    
+    // Добавляем фильтр по статусу
+    if (currentFilter !== 'all') {
+        url += `?status=${currentFilter}`;
+    }
+    
+    fetch(url)
         .then(response => response.json())
         .then(students => {
             displayStudents(students);
+            updateFilterDropdown();
         })
         .catch(error => {
             console.error('Ошибка при загрузке студентов:', error);
         });
+}
+
+// Обновление выпадающего списка фильтра
+function updateFilterDropdown() {
+    const filterSelect = document.getElementById('studentFilter');
+    if (filterSelect) {
+        filterSelect.value = currentFilter;
+    }
+}
+
+// Изменение фильтра
+function setFilter(filter) {
+    currentFilter = filter;
+    loadStudents();
 }
 
 // Отображение списка студентов с действиями
@@ -130,28 +156,95 @@ function displayStudents(students) {
     const container = document.getElementById('studentsList');
     
     if (students.length === 0) {
-        container.innerHTML = '<p>Студенты не найдены</p>';
+        container.innerHTML = '<div class="no-data-message">Студенты не найдены</div>';
         return;
     }
     
-    container.innerHTML = students.map(student => `
+    // Группируем студентов по статусу для лучшей организации
+    const accommodated = students.filter(s => s.status === 'accommodated');
+    const waiting = students.filter(s => s.status === 'waiting');
+    
+    let html = '';
+    
+    // Если показываем всех или только в очереди и есть ожидающие
+    if ((currentFilter === 'all' || currentFilter === 'waiting') && waiting.length > 0) {
+        html += `<div class="status-group">
+                    <h3><span class="status-badge waiting">В очереди</span> (${waiting.length} чел.)</h3>
+                    <div class="students-grid">`;
+        
+        waiting.forEach(student => {
+            html += createStudentCard(student);
+        });
+        
+        html += `</div></div>`;
+    }
+    
+    // Если показываем всех или только заселенных и есть заселенные
+    if ((currentFilter === 'all' || currentFilter === 'accommodated') && accommodated.length > 0) {
+        html += `<div class="status-group">
+                    <h3><span class="status-badge accommodated">Заселены</span> (${accommodated.length} чел.)</h3>
+                    <div class="students-grid">`;
+        
+        accommodated.forEach(student => {
+            html += createStudentCard(student);
+        });
+        
+        html += `</div></div>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+// Создание карточки студента
+function createStudentCard(student) {
+    return `
         <div class="student-card ${student.status}">
-            <h3>${student.full_name}</h3>
-            <p><strong>Статус:</strong> ${student.status === 'accommodated' ? 'Заселен' : 'В очереди'}</p>
-            <p><strong>Средний доход на члена семьи:</strong> ${student.income_per_member ? student.income_per_member.toFixed(2) : 'N/A'}</p>
-            <p><strong>Средний балл:</strong> ${student.average_grade}</p>
-            <p><strong>Общественная нагрузка:</strong> ${student.social_activity ? 'Да' : 'Нет'}</p>
-            ${student.dormitory_name ? `<p><strong>Общежитие:</strong> ${student.dormitory_name}</p>` : ''}
-            ${student.queue_position ? `<p><strong>Позиция в очереди:</strong> ${student.queue_position}</p>` : ''}
+            <div class="student-header">
+                <h3>${student.full_name}</h3>
+                <span class="student-status ${student.status}">
+                    ${student.status === 'accommodated' ? 'Заселен' : 'В очереди'}
+                </span>
+            </div>
+            
+            <div class="student-info">
+                <div class="info-row">
+                    <span class="info-label">Средний доход на члена семьи:</span>
+                    <span class="info-value">${student.income_per_member ? student.income_per_member.toFixed(2) + ' руб.' : 'N/A'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Средний балл:</span>
+                    <span class="info-value">${student.average_grade}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Общественная нагрузка:</span>
+                    <span class="info-value ${student.social_activity ? 'yes' : 'no'}">
+                        ${student.social_activity ? 'Да' : 'Нет'}
+                    </span>
+                </div>
+                ${student.dormitory_name ? `
+                <div class="info-row">
+                    <span class="info-label">Общежитие:</span>
+                    <span class="info-value">${student.dormitory_name}</span>
+                </div>` : ''}
+                ${student.queue_position ? `
+                <div class="info-row">
+                    <span class="info-label">Позиция в очереди:</span>
+                    <span class="info-value">${student.queue_position}</span>
+                </div>` : ''}
+            </div>
             
             <div class="student-actions">
                 ${student.status === 'waiting' ? 
-                    `<button onclick="openAccommodateModal(${student.id})">Заселить</button>` : 
-                    `<button onclick="evictStudent(${student.id})">Выселить</button>`
+                    `<button class="btn-accommodate" onclick="openAccommodateModal(${student.id})">
+                        <i class="action-icon"></i> Заселить
+                    </button>` : 
+                    `<button class="btn-evict" onclick="evictStudent(${student.id})">
+                        <i class="action-icon"></i> Выселить
+                    </button>`
                 }
             </div>
         </div>
-    `).join('');
+    `;
 }
 
 // Загрузка общежитий для выпадающего списка
@@ -321,6 +414,7 @@ function handleApplication(e) {
         if (data.success) {
             alert(data.message);
             e.target.reset();
+            loadStudents(); // Обновляем список студентов
         } else {
             alert('Ошибка: ' + data.error);
         }
@@ -394,8 +488,8 @@ function displayReport(data, reportType) {
         case 'free-places':
             tableHTML = `
                 <div class="export-buttons">
-                    <button onclick="exportReport('free-places', 'txt')">📝 Экспорт в TXT</button>
-                    <button onclick="exportReport('free-places', 'docx')">📄 Экспорт в DOCX</button>
+                    <button onclick="exportReport('free-places', 'txt')"> Экспорт в TXT</button>
+                    <button onclick="exportReport('free-places', 'docx')"> Экспорт в DOCX</button>
                 </div>
                 <table class="report-table">
                     <thead>
@@ -425,8 +519,8 @@ function displayReport(data, reportType) {
         case 'queue':
             tableHTML = `
                 <div class="export-buttons">
-                    <button onclick="exportReport('queue', 'txt')">📝 Экспорт в TXT</button>
-                    <button onclick="exportReport('queue', 'docx')">📄 Экспорт в DOCX</button>
+                    <button onclick="exportReport('queue', 'txt')"> Экспорт в TXT</button>
+                    <button onclick="exportReport('queue', 'docx')"> Экспорт в DOCX</button>
                 </div>
                 <table class="report-table">
                     <thead>
@@ -517,7 +611,7 @@ function exportReport(reportType, format) {
     
     // Показываем уведомление об успешном экспорте
     setTimeout(() => {
-        showExportNotification(`✅ Отчет "${getReportName(reportType)}" успешно экспортирован в формате ${format.toUpperCase()}!`, 'success');
+        showExportNotification(`Отчет "${getReportName(reportType)}" успешно экспортирован в формате ${format.toUpperCase()}!`, 'success');
     }, 500);
 }
 
@@ -542,7 +636,7 @@ function exportAllReports(format) {
     
     // Показываем уведомление об успешном экспорте
     setTimeout(() => {
-        showExportNotification(`✅ Все отчеты успешно экспортированы в формате ${format.toUpperCase()}!`, 'success');
+        showExportNotification(`Все отчеты успешно экспортированы в формате ${format.toUpperCase()}!`, 'success');
     }, 500);
 }
 

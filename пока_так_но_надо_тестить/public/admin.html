@@ -30,14 +30,34 @@
                 <button onclick="showSection('students')">Управление студентами</button>
                 <button onclick="showSection('applications')">Регистрация заявок</button>
                 <button onclick="showSection('reports')">Отчеты</button>
+                <button onclick="showSection('export')">Экспорт данных</button>
             </nav>
 
             <!-- Секция управления студентами -->
             <section id="studentsSection" class="section">
                 <h2>Управление студентами</h2>
-                <div class="controls">
-                    <button onclick="loadNextCandidate()">Следующий кандидат для заселения</button>
+                
+                <!-- Панель фильтров -->
+                <div class="filter-panel">
+                    <div class="filter-control-group">
+                        <label for="studentFilter" class="filter-label">Отображать студентов:</label>
+                        <select id="studentFilter" class="filter-select">
+                            <option value="all">Все студенты</option>
+                            <option value="accommodated">Только заселенные</option>
+                            <option value="waiting">Только в очереди</option>
+                        </select>
+                    </div>
+                    <div class="filter-info">
+                        <span id="filterInfoText">Показаны все студенты</span>
+                    </div>
                 </div>
+                
+                <div class="controls">
+                    <button onclick="loadNextCandidate()" class="btn-next-candidate">
+                        <i></i> Найти следующего кандидата для заселения
+                    </button>
+                </div>
+                
                 <div id="studentsList" class="students-list">
                     <!-- Список студентов будет загружен здесь -->
                 </div>
@@ -47,15 +67,25 @@
             <section id="applicationsSection" class="section" style="display: none;">
                 <h2>Регистрация новой заявки</h2>
                 <form id="applicationForm">
-                    <input type="text" id="fullName" placeholder="ФИО студента" required>
-                    <input type="number" id="familyIncome" placeholder="Доход семьи" step="0.01" required>
-                    <input type="number" id="familyMembers" placeholder="Количество членов семьи" required>
-                    <input type="number" id="averageGrade" placeholder="Средний балл (0-10)" min="0" max="10" step="0.1" required>
-                    <label>
-                        <input type="checkbox" id="socialActivity">
-                        Общественная нагрузка
-                    </label>
-                    <button type="submit">Зарегистрировать заявку</button>
+                    <div class="form-group">
+                        <input type="text" id="fullName" placeholder="ФИО студента" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="number" id="familyIncome" placeholder="Доход семьи (руб.)" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="number" id="familyMembers" placeholder="Количество членов семьи" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="number" id="averageGrade" placeholder="Средний балл (0-10)" min="0" max="10" step="0.1" required>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="socialActivity">
+                            <span>Общественная нагрузка</span>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn-submit">Зарегистрировать заявку</button>
                 </form>
             </section>
 
@@ -63,11 +93,107 @@
             <section id="reportsSection" class="section" style="display: none;">
                 <h2>Отчеты</h2>
                 <div class="report-controls">
-                    <button onclick="loadFreePlacesReport()">Свободные места</button>
-                    <button onclick="loadQueueReport()">Очередь на заселение</button>
+                    <button onclick="loadFreePlacesReport()" class="report-btn">
+                        <i></i> Свободные места
+                    </button>
+                    <button onclick="loadQueueReport()" class="report-btn">
+                        <i></i> Очередь на заселение
+                    </button>
+                    <button onclick="loadAccommodatedReport()" class="report-btn">
+                        <i></i> Заселенные студенты
+                    </button>
                 </div>
                 <div id="reportResults">
                     <!-- Результаты отчетов будут отображаться здесь -->
+                </div>
+            </section>
+
+            <!-- Секция экспорта данных -->
+            <section id="exportSection" class="section" style="display: none;">
+                <h2>Экспорт данных</h2>
+                
+                <!-- Быстрый экспорт всех отчетов -->
+                <div class="quick-export">
+                    <h3> Быстрый экспорт всех данных</h3>
+                    <div class="quick-buttons">
+                        <button class="quick-btn" onclick="exportAllReports('txt')">
+                             Экспорт всех отчетов (TXT)
+                        </button>
+                        <button class="quick-btn" onclick="exportAllReports('docx')">
+                             Экспорт всех отчетов (DOCX)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Детальный экспорт по типам отчетов -->
+                <div class="export-section">
+                    <h3> Экспорт по типам отчетов</h3>
+                    
+                    <div class="export-grid">
+                        <!-- Отчет о свободных местах -->
+                        <div class="export-card">
+                            <h4> Свободные места в общежитиях</h4>
+                            <p>Информация о доступных местах в каждом общежитии, включая тип, общее количество мест и занятые места.</p>
+                            <div class="export-actions">
+                                <button class="export-btn txt" onclick="exportReport('free-places', 'txt')">
+                                     TXT
+                                </button>
+                                <button class="export-btn docx" onclick="exportReport('free-places', 'docx')">
+                                     DOCX
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Отчет об очереди -->
+                        <div class="export-card">
+                            <h4> Очередь на заселение</h4>
+                            <p>Список студентов в очереди с приоритетом, доходом на члена семьи, средним баллом и датой заявки.</p>
+                            <div class="export-actions">
+                                <button class="export-btn txt" onclick="exportReport('queue', 'txt')">
+                                     TXT
+                                </button>
+                                <button class="export-btn docx" onclick="exportReport('queue', 'docx')">
+                                     DOCX
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Отчет о заселенных студентах -->
+                        <div class="export-card">
+                            <h4> Заселенные студенты</h4>
+                            <p>Информация о студентах, которые уже заселены в общежития, с указанием номера общежития и типа.</p>
+                            <div class="export-actions">
+                                <button class="export-btn txt" onclick="exportReport('accommodated', 'txt')">
+                                     TXT
+                                </button>
+                                <button class="export-btn docx" onclick="exportReport('accommodated', 'docx')">
+                                     DOCX
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Все отчеты -->
+                        <div class="export-card">
+                            <h4> Все отчеты в одном файле</h4>
+                            <p>Полный сводный отчет, включающий все три типа отчетов с итоговой информацией.</p>
+                            <div class="export-actions">
+                                <button class="export-btn txt" onclick="exportReport('all', 'txt')">
+                                     TXT
+                                </button>
+                                <button class="export-btn docx" onclick="exportReport('all', 'docx')">
+                                     DOCX
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Статистика экспорта -->
+                <div id="exportStats" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                    <h3> Статистика системы</h3>
+                    <div id="statsContent">
+                        <p>Загружается статистика...</p>
+                    </div>
                 </div>
             </section>
         </div>
@@ -79,14 +205,16 @@
             <h3>Заселение студента</h3>
             <form id="accommodateForm">
                 <input type="hidden" id="accommodateStudentId">
-                <div>
-                    <label>Общежитие:</label>
-                    <select id="dormitorySelect" required>
+                <div class="form-group">
+                    <label for="dormitorySelect" class="form-label">Общежитие:</label>
+                    <select id="dormitorySelect" class="form-select" required>
                         <option value="">Выберите общежитие</option>
                     </select>
                 </div>
-                <button type="submit">Заселить</button>
-                <button type="button" onclick="closeModal()">Отмена</button>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-submit">Заселить</button>
+                    <button type="button" onclick="closeModal()" class="btn-cancel">Отмена</button>
+                </div>
             </form>
         </div>
     </div>

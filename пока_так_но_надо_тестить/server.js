@@ -68,9 +68,9 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// Получение списка студентов (публичный доступ)
+// Получение списка студентов (публичный доступ) - ОБНОВЛЕНО
 app.get('/api/students', (req, res) => {
-    const { search } = req.query;
+    const { search, status } = req.query;
     
     let query = `
         SELECT s.*, 
@@ -108,11 +108,26 @@ app.get('/api/students', (req, res) => {
         LEFT JOIN dormitories d ON s.dormitory_id = d.id
     `;
     
+    let conditions = [];
     let params = [];
     
+    if (status) {
+        if (status === 'accommodated') {
+            conditions.push('s.status = ?');
+            params.push('accommodated');
+        } else if (status === 'waiting') {
+            conditions.push('s.status = ?');
+            params.push('waiting');
+        }
+    }
+    
     if (search) {
-        query += ' WHERE s.full_name LIKE ?';
+        conditions.push('s.full_name LIKE ?');
         params.push(`%${search}%`);
+    }
+    
+    if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
     }
     
     query += ' ORDER BY s.status, queue_position';

@@ -71,7 +71,6 @@ button {
     color: white;
     border: none;
     cursor: pointer;
-    transition: background-color 0.3s;
 }
 
 button:hover {
@@ -176,34 +175,8 @@ button:hover {
 .controls {
     margin-bottom: 1rem;
 }
+/* ... существующие стили ... */
 
-.export-buttons {
-    display: flex;
-    gap: 10px;
-    margin: 20px 0;
-    flex-wrap: wrap;
-}
-
-.export-buttons button {
-    padding: 8px 16px;
-    font-size: 0.9em;
-}
-
-.export-buttons button:nth-child(1) {
-    background: #2ecc71;
-}
-
-.export-buttons button:nth-child(1):hover {
-    background: #27ae60;
-}
-
-.export-buttons button:nth-child(2) {
-    background: #3498db;
-}
-
-.export-buttons button:nth-child(2):hover {
-    background: #2980b9;
-}
 /* Стили для кнопок экспорта */
 .export-buttons {
     display: flex;
@@ -363,4 +336,546 @@ button:hover {
     background: white;
     color: #667eea;
     transform: translateY(-2px);
+}
+
+/* Стили для статистики */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.stat-card {
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: #3498db;
+    margin: 10px 0;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    color: #666;
+}/* Стили для фильтров */
+.filter-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: 2px solid #007bff;
+    background-color: white;
+    color: #007bff;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.filter-btn:hover {
+    background-color: #007bff;
+    color: white;
+}
+
+.filter-btn.active {
+    background-color: #007bff;
+    color: white;
+    font-weight: bold;
+}
+
+/* Панель фильтров в админке */
+.filter-panel {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f0f8ff;
+    border-radius: 5px;
+    border-left: 4px solid #007bff;
+}
+
+/* Медиа-запросы для мобильных устройств */
+@media (max-width: 768px) {
+    .filter-buttons {
+        flex-direction: column;
+    }
+    
+    .filter-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+/* ========== СТИЛИ ДЛЯ ВЫПАДАЮЩЕГО СПИСКА ФИЛЬТРА ========== */
+
+.filter-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #3498db;
+}
+
+.filter-control {
+    margin-top: 10px;
+}
+
+.filter-select {
+    padding: 10px 15px;
+    border: 2px solid #3498db;
+    border-radius: 5px;
+    background-color: white;
+    font-size: 16px;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.3s;
+    width: 100%;
+    max-width: 300px;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: #2980b9;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.filter-select option {
+    padding: 10px;
+    font-size: 14px;
+}
+
+/* Панель фильтров в админке */
+.filter-panel {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    border-left: 5px solid #3498db;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.filter-control-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.filter-label {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 16px;
+    white-space: nowrap;
+}
+
+.filter-info {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background-color: #e8f4fc;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #2c3e50;
+}
+
+/* ========== СТИЛИ ДЛЯ КАРТОЧЕК СТУДЕНТОВ ========== */
+
+.students-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.status-group {
+    margin-bottom: 30px;
+}
+
+.status-group h3 {
+    color: #2c3e50;
+    font-size: 18px;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #ecf0f1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.status-badge.waiting {
+    background-color: #f39c12;
+    color: white;
+}
+
+.status-badge.accommodated {
+    background-color: #27ae60;
+    color: white;
+}
+
+.student-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    transition: transform 0.3s, box-shadow 0.3s;
+    border-top: 4px solid #3498db;
+    position: relative;
+    overflow: hidden;
+}
+
+.student-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.student-card.waiting {
+    border-top-color: #f39c12;
+}
+
+.student-card.accommodated {
+    border-top-color: #27ae60;
+}
+
+.student-card.waiting::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: 100%;
+    background-color: #f39c12;
+}
+
+.student-card.accommodated::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: 100%;
+    background-color: #27ae60;
+}
+
+.student-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.student-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 18px;
+    line-height: 1.4;
+}
+
+.student-status {
+    padding: 4px 10px;
+    border-radius: 15px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.student-status.waiting {
+    background-color: rgba(243, 156, 18, 0.1);
+    color: #f39c12;
+    border: 1px solid rgba(243, 156, 18, 0.3);
+}
+
+.student-status.accommodated {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: #27ae60;
+    border: 1px solid rgba(39, 174, 96, 0.3);
+}
+
+.student-info {
+    margin-bottom: 15px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dotted #eee;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.info-label {
+    color: #7f8c8d;
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+}
+
+.info-value {
+    color: #2c3e50;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+    flex: 1;
+}
+
+.info-value.yes {
+    color: #27ae60;
+}
+
+.info-value.no {
+    color: #e74c3c;
+}
+
+/* ========== СТИЛИ ДЛЯ КНОПОК ДЕЙСТВИЙ ========== */
+
+.student-actions {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    text-align: center;
+}
+
+.btn-accommodate, .btn-evict {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.btn-accommodate {
+    background-color: #3498db;
+    color: white;
+}
+
+.btn-accommodate:hover {
+    background-color: #2980b9;
+    transform: scale(1.02);
+}
+
+.btn-evict {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.btn-evict:hover {
+    background-color: #c0392b;
+    transform: scale(1.02);
+}
+
+.action-icon {
+    font-size: 16px;
+}
+
+/* Кнопка следующего кандидата */
+.btn-next-candidate {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(52, 152, 219, 0.3);
+}
+
+.btn-next-candidate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(52, 152, 219, 0.4);
+}
+
+/* Сообщение об отсутствии данных */
+.no-data-message {
+    text-align: center;
+    padding: 40px 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    color: #7f8c8d;
+    font-size: 18px;
+    border: 2px dashed #dee2e6;
+}
+
+/* ========== ОТВЕТСТВЕННЫЙ ДИЗАЙН ========== */
+
+@media (max-width: 768px) {
+    .students-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-control-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .filter-select {
+        max-width: 100%;
+    }
+    
+    .filter-label {
+        font-size: 14px;
+    }
+    
+    .student-card {
+        padding: 15px;
+    }
+    
+    .info-row {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .info-value {
+        text-align: left;
+    }
+}
+
+@media (max-width: 480px) {
+    .status-group h3 {
+        font-size: 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .student-header {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .student-status {
+        align-self: flex-start;
+    }
+}
+
+/* ========== СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА ========== */
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    color: #2c3e50;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.form-select {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.btn-submit, .btn-cancel {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    flex: 1;
+}
+
+.btn-submit {
+    background-color: #3498db;
+    color: white;
+}
+
+.btn-submit:hover {
+    background-color: #2980b9;
+}
+
+.btn-cancel {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.btn-cancel:hover {
+    background-color: #7f8c8d;
 }
