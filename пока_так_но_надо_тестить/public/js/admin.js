@@ -489,7 +489,7 @@ function displayReport(data, reportType) {
             tableHTML = `
                 <div class="export-buttons">
                     <button onclick="exportReport('free-places', 'txt')"> Экспорт в TXT</button>
-                    <button onclick="exportReport('free-places', 'docx')"> Экспорт в DOCX</button>
+                    <button onclick="exportReport('free-places', 'docx')"> Экспорт в HTML</button>
                 </div>
                 <table class="report-table">
                     <thead>
@@ -520,7 +520,7 @@ function displayReport(data, reportType) {
             tableHTML = `
                 <div class="export-buttons">
                     <button onclick="exportReport('queue', 'txt')"> Экспорт в TXT</button>
-                    <button onclick="exportReport('queue', 'docx')"> Экспорт в DOCX</button>
+                    <button onclick="exportReport('queue', 'docx')"> Экспорт в HTML</button>
                 </div>
                 <table class="report-table">
                     <thead>
@@ -553,7 +553,7 @@ function displayReport(data, reportType) {
             tableHTML = `
                 <div class="export-buttons">
                     <button onclick="exportReport('accommodated', 'txt')">📝 Экспорт в TXT</button>
-                    <button onclick="exportReport('accommodated', 'docx')">📄 Экспорт в DOCX</button>
+                    <button onclick="exportReport('accommodated', 'docx')">📄 Экспорт в HTML</button>
                 </div>
                 <table class="report-table">
                     <thead>
@@ -595,8 +595,11 @@ function exportReport(reportType, format) {
     // Проверяем авторизацию
     if (!checkAuth()) return;
     
+    // Получаем отображаемое имя формата
+    const displayFormat = format === 'docx' ? 'HTML' : format.toUpperCase();
+    
     // Показываем уведомление о начале экспорта
-    showExportNotification(`Начинается экспорт отчета "${getReportName(reportType)}" в формате ${format.toUpperCase()}...`);
+    showExportNotification(`Начинается экспорт отчета "${getReportName(reportType)}" в формате ${displayFormat}...`);
     
     // Создаем URL для экспорта
     const url = `/api/export/${reportType}/${format}`;
@@ -611,7 +614,7 @@ function exportReport(reportType, format) {
     
     // Показываем уведомление об успешном экспорте
     setTimeout(() => {
-        showExportNotification(`Отчет "${getReportName(reportType)}" успешно экспортирован в формате ${format.toUpperCase()}!`, 'success');
+        showExportNotification(`Отчет "${getReportName(reportType)}" успешно экспортирован в формате ${displayFormat}!`, 'success');
     }, 500);
 }
 
@@ -620,8 +623,11 @@ function exportAllReports(format) {
     // Проверяем авторизацию
     if (!checkAuth()) return;
     
+    // Получаем отображаемое имя формата
+    const displayFormat = format === 'docx' ? 'HTML' : format.toUpperCase();
+    
     // Показываем уведомление о начале экспорта
-    showExportNotification(`Начинается экспорт всех отчетов в формате ${format.toUpperCase()}...`);
+    showExportNotification(`Начинается экспорт всех отчетов в формате ${displayFormat}...`);
     
     // Создаем URL для экспорта
     const url = `/api/export/all/${format}`;
@@ -636,7 +642,7 @@ function exportAllReports(format) {
     
     // Показываем уведомление об успешном экспорте
     setTimeout(() => {
-        showExportNotification(`Все отчеты успешно экспортированы в формате ${format.toUpperCase()}!`, 'success');
+        showExportNotification(`Все отчеты успешно экспортированы в формате ${displayFormat}!`, 'success');
     }, 500);
 }
 
@@ -750,9 +756,8 @@ function loadExportStats() {
                 </div>
             </div>
             <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-                <p><strong>Последний экспорт:</strong> <span id="lastExportTime">Нет данных</span></p>
                 <p><strong>Готово к экспорту:</strong> ${totalStudents} записей</p>
-                <p><strong>Рекомендуемый формат:</strong> Для анализа данных используйте TXT, для печати - DOCX</p>
+                <p><strong>Рекомендуемый формат:</strong> Для анализа данных используйте TXT, для печати - HTML</p>
             </div>
         `;
         
