@@ -879,3 +879,12 @@ button:hover {
 .btn-cancel:hover {
     background-color: #7f8c8d;
 }
+
+ footer {
+        flex-shrink: 0;
+        margin-top: auto;
+        background-color: #f8f9fa; /* опционально */
+        padding: 10px;
+        text-align: center;
+        border-top: 1px solid #dee2e6; /* опционально */
+}
