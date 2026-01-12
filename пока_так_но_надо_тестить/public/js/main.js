@@ -1,10 +1,9 @@
-let currentFilter = 'all'; // all, accommodated, waiting
+let currentFilter = 'all';
 
 // Загрузка списка студентов при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
     loadStudents();
     
-    // Обработчик изменения фильтра
     document.getElementById('studentFilter').addEventListener('change', function() {
         setFilter(this.value);
     });
@@ -14,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
 function loadStudents(search = '') {
     let url = '/api/students';
     
-    // Добавляем параметры поиска и фильтра
     const params = new URLSearchParams();
     
     if (search) {
@@ -64,13 +62,11 @@ function displayStudents(students) {
         return;
     }
     
-    // Группируем студентов по статусу для лучшей организации
     const accommodated = students.filter(s => s.status === 'accommodated');
     const waiting = students.filter(s => s.status === 'waiting');
     
     let html = '';
     
-    // Если показываем всех или только в очереди и есть ожидающие
     if ((currentFilter === 'all' || currentFilter === 'waiting') && waiting.length > 0) {
         html += `<div class="status-group">
                     <h3><span class="status-badge waiting">В очереди</span> (${waiting.length} чел.)</h3>
@@ -83,7 +79,6 @@ function displayStudents(students) {
         html += `</div></div>`;
     }
     
-    // Если показываем всех или только заселенных и есть заселенные
     if ((currentFilter === 'all' || currentFilter === 'accommodated') && accommodated.length > 0) {
         html += `<div class="status-group">
                     <h3><span class="status-badge accommodated">Заселены</span> (${accommodated.length} чел.)</h3>
@@ -101,6 +96,8 @@ function displayStudents(students) {
 
 // Создание карточки студента (публичная версия)
 function createStudentCard(student) {
+    const incomePerMember = student.family_income / student.family_members;
+    
     return `
         <div class="student-card ${student.status}">
             <div class="student-header">
@@ -113,7 +110,7 @@ function createStudentCard(student) {
             <div class="student-info">
                 <div class="info-row">
                     <span class="info-label">Средний доход на члена семьи:</span>
-                    <span class="info-value">${student.income_per_member ? student.income_per_member.toFixed(2) + ' руб.' : 'N/A'}</span>
+                    <span class="info-value">${incomePerMember.toFixed(2)} руб.</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Средний балл:</span>
@@ -130,10 +127,10 @@ function createStudentCard(student) {
                     <span class="info-label">Общежитие:</span>
                     <span class="info-value">${student.dormitory_name}</span>
                 </div>` : ''}
-                ${student.queue_position ? `
+                ${student.status === 'waiting' ? `
                 <div class="info-row">
                     <span class="info-label">Позиция в очереди:</span>
-                    <span class="info-value">${student.queue_position}</span>
+                    <span class="info-value">${student.queue_position || 'Рассчитывается...'}</span>
                 </div>` : ''}
             </div>
         </div>

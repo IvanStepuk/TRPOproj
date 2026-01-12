@@ -17,28 +17,27 @@ const sessions = {};
 
 // Функция для расчета приоритета студента
 function calculatePriority(student) {
-    // Балльная система для точного расчета
     let priorityScore = 0;
     
-    // 1. Средний балл (максимальный вес - 1000 баллов)
+    // 1. Средний балл
     priorityScore += student.average_grade * 100;
     
-    // 2. Общественная нагрузка (значительный бонус - 50 баллов)
+    // 2. Общественная нагрузка
     if (student.social_activity) {
         priorityScore += 50;
     }
     
-    // 3. Доход на члена семьи (чем меньше доход - тем выше приоритет)
+    // 3. Доход на члена семьи
     const incomePerMember = student.family_income / student.family_members;
     if (incomePerMember <= 100) priorityScore += 40;
     else if (incomePerMember <= 300) priorityScore += 30;
     else if (incomePerMember <= 500) priorityScore += 20;
     else if (incomePerMember <= 1000) priorityScore += 10;
     
-    // 4. Дата заявки (чем раньше - тем выше приоритет)
+    // 4. Дата заявки
     const applicationDate = new Date(student.application_date);
     const daysDiff = Math.floor((new Date() - applicationDate) / (1000 * 60 * 60 * 24));
-    priorityScore += Math.max(0, 30 - daysDiff); // Максимум 30 баллов за раннюю заявку
+    priorityScore += Math.max(0, 30 - daysDiff);
     
     return priorityScore;
 }
@@ -68,42 +67,14 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// Получение списка студентов (публичный доступ) - ОБНОВЛЕНО
+// Получение списка студентов (публичный доступ) - ИСПРАВЛЕННЫЙ
 app.get('/api/students', (req, res) => {
     const { search, status } = req.query;
     
-    let query = `
+    let baseQuery = `
         SELECT s.*, 
                d.name as dormitory_name,
-               (s.family_income / s.family_members) as income_per_member,
-               (s.average_grade * 100 + 
-                CASE WHEN s.social_activity THEN 50 ELSE 0 END +
-                CASE 
-                    WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                    WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                    WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                    WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                    ELSE 0
-                END +
-                (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))
-               ) as priority_score,
-               (CASE 
-                   WHEN s.status = 'waiting' THEN 
-                       RANK() OVER (ORDER BY 
-                           (s.average_grade * 100 + 
-                            CASE WHEN s.social_activity THEN 50 ELSE 0 END +
-                            CASE 
-                                WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                                WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                                WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                                WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                                ELSE 0
-                            END +
-                            (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))
-                           ) DESC,
-                           s.application_date ASC)
-                   ELSE NULL 
-               END) as queue_position
+               (s.family_income / s.family_members) as income_per_member
         FROM students s
         LEFT JOIN dormitories d ON s.dormitory_id = d.id
     `;
@@ -127,17 +98,61 @@ app.get('/api/students', (req, res) => {
     }
     
     if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ');
+        baseQuery += ' WHERE ' + conditions.join(' AND ');
     }
     
-    query += ' ORDER BY s.status, queue_position';
-    
-    db.all(query, params, (err, rows) => {
+    db.all(baseQuery, params, (err, students) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
-        res.json(rows);
+        
+        // Рассчитываем позиции для студентов в очереди
+        const waitingStudents = students.filter(s => s.status === 'waiting');
+        
+        waitingStudents.forEach(student => {
+            const studentPriority = calculatePriority(student);
+            
+            let higherPriorityCount = 0;
+            waitingStudents.forEach(s => {
+                if (s.id === student.id) return;
+                
+                const sPriority = calculatePriority(s);
+                if (sPriority > studentPriority) {
+                    higherPriorityCount++;
+                } else if (sPriority === studentPriority) {
+                    const sDate = new Date(s.application_date);
+                    const studentDate = new Date(student.application_date);
+                    if (sDate < studentDate) {
+                        higherPriorityCount++;
+                    }
+                }
+            });
+            
+            student.queue_position = higherPriorityCount + 1;
+        });
+        
+        // Обновляем позиции в основном массиве
+        students.forEach(student => {
+            if (student.status === 'waiting') {
+                const waitingStudent = waitingStudents.find(s => s.id === student.id);
+                if (waitingStudent) {
+                    student.queue_position = waitingStudent.queue_position;
+                }
+            }
+        });
+        
+        // Сортируем: сначала заселенные, затем в очереди по позиции
+        students.sort((a, b) => {
+            if (a.status === 'accommodated' && b.status === 'waiting') return -1;
+            if (a.status === 'waiting' && b.status === 'accommodated') return 1;
+            if (a.status === 'waiting' && b.status === 'waiting') {
+                return (a.queue_position || 999) - (b.queue_position || 999);
+            }
+            return 0;
+        });
+        
+        res.json(students);
     });
 });
 
@@ -173,49 +188,48 @@ app.get('/api/reports/free-places', (req, res) => {
     });
 });
 
-// Получение отчета об очереди
+// Получение отчета об очереди - ИСПРАВЛЕННЫЙ
 app.get('/api/reports/queue', (req, res) => {
     db.all(`
         SELECT 
-            s.id,
-            s.full_name,
-            (s.family_income / s.family_members) as income_per_member,
-            s.average_grade,
-            s.social_activity,
-            s.application_date,
-            (s.average_grade * 100 + 
-             CASE WHEN s.social_activity THEN 50 ELSE 0 END +
-             CASE 
-                 WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                 WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                 WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                 WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                 ELSE 0
-             END +
-             (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))
-            ) as priority_score,
-            RANK() OVER (ORDER BY 
-                (s.average_grade * 100 + 
-                 CASE WHEN s.social_activity THEN 50 ELSE 0 END +
-                 CASE 
-                     WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                     WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                     WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                     WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                     ELSE 0
-                 END +
-                 (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))
-                ) DESC,
-                s.application_date ASC) as queue_position
+            s.*,
+            (s.family_income / s.family_members) as income_per_member
         FROM students s
         WHERE s.status = 'waiting'
-        ORDER BY queue_position
-    `, (err, rows) => {
+    `, (err, students) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
-        res.json(rows);
+        
+        // Рассчитываем позиции для каждого студента
+        students.forEach(student => {
+            const studentPriority = calculatePriority(student);
+            
+            let higherPriorityCount = 0;
+            students.forEach(s => {
+                if (s.id === student.id) return;
+                
+                const sPriority = calculatePriority(s);
+                if (sPriority > studentPriority) {
+                    higherPriorityCount++;
+                } else if (sPriority === studentPriority) {
+                    const sDate = new Date(s.application_date);
+                    const studentDate = new Date(student.application_date);
+                    if (sDate < studentDate) {
+                        higherPriorityCount++;
+                    }
+                }
+            });
+            
+            student.queue_position = higherPriorityCount + 1;
+            student.priority_score = studentPriority;
+        });
+        
+        // Сортируем по позиции в очереди
+        students.sort((a, b) => a.queue_position - b.queue_position);
+        
+        res.json(students);
     });
 });
 
@@ -243,10 +257,14 @@ app.get('/api/reports/accommodated', (req, res) => {
     });
 });
 
-// Экспорт отчета в TXT формате
-app.get('/api/export/:reportType/txt', (req, res) => {
-    const { reportType } = req.params;
+// Экспорт отчета в разных форматах
+app.get('/api/export/:reportType/:format', (req, res) => {
+    const { reportType, format } = req.params;
     let query = '';
+    
+    if (format !== 'txt' && format !== 'html') {
+        return res.status(400).json({ error: 'Неподдерживаемый формат. Используйте txt или html' });
+    }
     
     switch(reportType) {
         case 'free-places':
@@ -265,27 +283,10 @@ app.get('/api/export/:reportType/txt', (req, res) => {
         case 'queue':
             query = `
                 SELECT 
-                    s.full_name,
-                    (s.family_income / s.family_members) as income_per_member,
-                    s.average_grade,
-                    s.social_activity,
-                    s.application_date,
-                    RANK() OVER (ORDER BY 
-                        (s.average_grade * 100 + 
-                         CASE WHEN s.social_activity THEN 50 ELSE 0 END +
-                         CASE 
-                             WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                             WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                             WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                             WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                             ELSE 0
-                         END +
-                         (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))
-                        ) DESC,
-                        s.application_date ASC) as queue_position
+                    s.*,
+                    (s.family_income / s.family_members) as income_per_member
                 FROM students s
                 WHERE s.status = 'waiting'
-                ORDER BY queue_position
             `;
             break;
             
@@ -306,8 +307,7 @@ app.get('/api/export/:reportType/txt', (req, res) => {
             break;
             
         case 'all':
-            // Экспорт всех отчетов
-            exportAllReports(res);
+            exportAllReports(res, format);
             return;
             
         default:
@@ -320,106 +320,55 @@ app.get('/api/export/:reportType/txt', (req, res) => {
             return;
         }
         
-        const fileName = `report_${reportType}_${new Date().toISOString().slice(0,10)}.txt`;
-        const reportText = generateTxtReport(rows, reportType);
-        
-        res.setHeader('Content-Type', 'text/plain');
-        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-        res.send(reportText);
-    });
-});
-
-// Экспорт отчета в DOCX формате (простейшая реализация в виде HTML)
-app.get('/api/export/:reportType/docx', (req, res) => {
-    const { reportType } = req.params;
-    let query = '';
-    
-    switch(reportType) {
-        case 'free-places':
-            query = `
-                SELECT 
-                    d.name,
-                    d.type,
-                    d.total_places,
-                    d.occupied_places,
-                    (d.total_places - d.occupied_places) as free_places
-                FROM dormitories d
-                ORDER BY d.name
-            `;
-            break;
+        if (reportType === 'queue') {
+            rows.forEach(student => {
+                const studentPriority = calculatePriority(student);
+                
+                let higherPriorityCount = 0;
+                rows.forEach(s => {
+                    if (s.id === student.id) return;
+                    
+                    const sPriority = calculatePriority(s);
+                    if (sPriority > studentPriority) {
+                        higherPriorityCount++;
+                    } else if (sPriority === studentPriority) {
+                        const sDate = new Date(s.application_date);
+                        const studentDate = new Date(student.application_date);
+                        if (sDate < studentDate) {
+                            higherPriorityCount++;
+                        }
+                    }
+                });
+                
+                student.queue_position = higherPriorityCount + 1;
+            });
             
-        case 'queue':
-            query = `
-                SELECT 
-                    s.full_name,
-                    (s.family_income / s.family_members) as income_per_member,
-                    s.average_grade,
-                    s.social_activity,
-                    s.application_date,
-                    RANK() OVER (ORDER BY 
-                        (s.average_grade * 100 + 
-                         CASE WHEN s.social_activity THEN 50 ELSE 0 END +
-                         CASE 
-                             WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                             WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                             WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                             WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                             ELSE 0
-                         END +
-                         (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))
-                        ) DESC,
-                        s.application_date ASC) as queue_position
-                FROM students s
-                WHERE s.status = 'waiting'
-                ORDER BY queue_position
-            `;
-            break;
-            
-        case 'accommodated':
-            query = `
-                SELECT 
-                    s.full_name,
-                    s.average_grade,
-                    s.social_activity,
-                    s.application_date,
-                    d.name as dormitory_name,
-                    d.type as dormitory_type
-                FROM students s
-                LEFT JOIN dormitories d ON s.dormitory_id = d.id
-                WHERE s.status = 'accommodated'
-                ORDER BY s.full_name
-            `;
-            break;
-            
-        case 'all':
-            // Экспорт всех отчетов
-            exportAllReportsDocx(res);
-            return;
-            
-        default:
-            return res.status(400).json({ error: 'Неверный тип отчета' });
-    }
-    
-    db.all(query, (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
+            rows.sort((a, b) => a.queue_position - b.queue_position);
         }
         
-        const fileName = `report_${reportType}_${new Date().toISOString().slice(0,10)}.html`;
-        const reportHtml = generateDocxReport(rows, reportType);
+        const fileName = `report_${reportType}_${new Date().toISOString().slice(0,10)}.${format}`;
         
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-        res.send(reportHtml);
+        if (format === 'txt') {
+            const reportText = generateTxtReport(rows, reportType);
+            
+            res.setHeader('Content-Type', 'text/plain');
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+            res.send(reportText);
+        } else if (format === 'html') {
+            const reportHtml = generateHtmlReport(rows, reportType);
+            
+            res.setHeader('Content-Type', 'text/html');
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+            res.send(reportHtml);
+        }
     });
 });
 
-// Функция для экспорта всех отчетов в TXT
-function exportAllReports(res) {
+// Функция для экспорта всех отчетов
+function exportAllReports(res, format) {
     const queries = {
         'free-places': `SELECT d.name, d.type, d.total_places, d.occupied_places, (d.total_places - d.occupied_places) as free_places FROM dormitories d ORDER BY d.name`,
-        'queue': `SELECT s.full_name, (s.family_income / s.family_members) as income_per_member, s.average_grade, s.social_activity, s.application_date, RANK() OVER (ORDER BY (s.average_grade * 100 + CASE WHEN s.social_activity THEN 50 ELSE 0 END + CASE WHEN (s.family_income / s.family_members) <= 100 THEN 40 WHEN (s.family_income / s.family_members) <= 300 THEN 30 WHEN (s.family_income / s.family_members) <= 500 THEN 20 WHEN (s.family_income / s.family_members) <= 1000 THEN 10 ELSE 0 END + (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))) DESC, s.application_date ASC) as queue_position FROM students s WHERE s.status = 'waiting' ORDER BY queue_position`,
+        'queue': `SELECT s.*, (s.family_income / s.family_members) as income_per_member FROM students s WHERE s.status = 'waiting'`,
         'accommodated': `SELECT s.full_name, s.average_grade, s.social_activity, s.application_date, d.name as dormitory_name, d.type as dormitory_type FROM students s LEFT JOIN dormitories d ON s.dormitory_id = d.id WHERE s.status = 'accommodated' ORDER BY s.full_name`
     };
     
@@ -431,51 +380,53 @@ function exportAllReports(res) {
             if (err) {
                 console.error(`Error fetching ${reportType}:`, err);
             } else {
+                if (reportType === 'queue') {
+                    rows.forEach(student => {
+                        const studentPriority = calculatePriority(student);
+                        
+                        let higherPriorityCount = 0;
+                        rows.forEach(s => {
+                            if (s.id === student.id) return;
+                            
+                            const sPriority = calculatePriority(s);
+                            if (sPriority > studentPriority) {
+                                higherPriorityCount++;
+                            } else if (sPriority === studentPriority) {
+                                const sDate = new Date(s.application_date);
+                                const studentDate = new Date(student.application_date);
+                                if (sDate < studentDate) {
+                                    higherPriorityCount++;
+                                }
+                            }
+                        });
+                        
+                        student.queue_position = higherPriorityCount + 1;
+                    });
+                    
+                    rows.sort((a, b) => a.queue_position - b.queue_position);
+                }
+                
                 results[reportType] = rows;
             }
             
             completed++;
             
             if (completed === Object.keys(queries).length) {
-                const fileName = `all_reports_${new Date().toISOString().slice(0,10)}.txt`;
-                const reportText = generateAllReportsTxt(results);
+                const fileName = `all_reports_${new Date().toISOString().slice(0,10)}.${format}`;
                 
-                res.setHeader('Content-Type', 'text/plain');
-                res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-                res.send(reportText);
-            }
-        });
-    });
-}
-
-// Функция для экспорта всех отчетов в DOCX
-function exportAllReportsDocx(res) {
-    const queries = {
-        'free-places': `SELECT d.name, d.type, d.total_places, d.occupied_places, (d.total_places - d.occupied_places) as free_places FROM dormitories d ORDER BY d.name`,
-        'queue': `SELECT s.full_name, (s.family_income / s.family_members) as income_per_member, s.average_grade, s.social_activity, s.application_date, RANK() OVER (ORDER BY (s.average_grade * 100 + CASE WHEN s.social_activity THEN 50 ELSE 0 END + CASE WHEN (s.family_income / s.family_members) <= 100 THEN 40 WHEN (s.family_income / s.family_members) <= 300 THEN 30 WHEN (s.family_income / s.family_members) <= 500 THEN 20 WHEN (s.family_income / s.family_members) <= 1000 THEN 10 ELSE 0 END + (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))) DESC, s.application_date ASC) as queue_position FROM students s WHERE s.status = 'waiting' ORDER BY queue_position`,
-        'accommodated': `SELECT s.full_name, s.average_grade, s.social_activity, s.application_date, d.name as dormitory_name, d.type as dormitory_type FROM students s LEFT JOIN dormitories d ON s.dormitory_id = d.id WHERE s.status = 'accommodated' ORDER BY s.full_name`
-    };
-    
-    const results = {};
-    let completed = 0;
-    
-    Object.keys(queries).forEach(reportType => {
-        db.all(queries[reportType], (err, rows) => {
-            if (err) {
-                console.error(`Error fetching ${reportType}:`, err);
-            } else {
-                results[reportType] = rows;
-            }
-            
-            completed++;
-            
-            if (completed === Object.keys(queries).length) {
-                const fileName = `all_reports_${new Date().toISOString().slice(0,10)}.html`;
-                const reportHtml = generateAllReportsDocx(results);
-                
-                res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-                res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-                res.send(reportHtml);
+                if (format === 'txt') {
+                    const reportText = generateAllReportsTxt(results);
+                    
+                    res.setHeader('Content-Type', 'text/plain');
+                    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+                    res.send(reportText);
+                } else if (format === 'html') {
+                    const reportHtml = generateAllReportsHtml(results);
+                    
+                    res.setHeader('Content-Type', 'text/html');
+                    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+                    res.send(reportHtml);
+                }
             }
         });
     });
@@ -546,67 +497,340 @@ function generateTxtReport(rows, reportType) {
     return report;
 }
 
-// Генерация DOCX отчета (простой HTML)
-function generateDocxReport(rows, reportType) {
-    let html = '<!DOCTYPE html><html><head><meta charset="UTF-8">';
-    html += '<style>body { font-family: Arial, sans-serif; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; }</style>';
-    html += '</head><body>';
-    
+// Генерация HTML отчета (простой стиль как в TXT, готовый к печати)
+function generateHtmlReport(rows, reportType) {
     const now = new Date();
+    let title = '';
+    let headers = '';
+    let tableRows = '';
+    let summary = '';
     
     switch(reportType) {
         case 'free-places':
-            html += '<h1>ОТЧЕТ О СВОБОДНЫХ МЕСТАХ В ОБЩЕЖИТИЯХ</h1>';
-            html += `<p>Дата формирования: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}</p>`;
-            html += '<table><thead><tr><th>Общежитие</th><th>Тип</th><th>Всего мест</th><th>Занято</th><th>Свободно</th></tr></thead><tbody>';
+            title = 'ОТЧЕТ О СВОБОДНЫХ МЕСТАХ В ОБЩЕЖИТИЯХ';
+            headers = `
+                <tr>
+                    <th>Общежитие</th>
+                    <th>Тип</th>
+                    <th>Всего мест</th>
+                    <th>Занято</th>
+                    <th>Свободно</th>
+                </tr>
+            `;
             
             rows.forEach(row => {
                 const type = row.type === 'family' ? 'Семейное' : 'Несемейное';
-                html += `<tr><td>${row.name}</td><td>${type}</td><td>${row.total_places}</td><td>${row.occupied_places}</td><td>${row.free_places}</td></tr>`;
+                tableRows += `
+                    <tr>
+                        <td>${row.name}</td>
+                        <td>${type}</td>
+                        <td>${row.total_places}</td>
+                        <td>${row.occupied_places}</td>
+                        <td>${row.free_places}</td>
+                    </tr>
+                `;
             });
             
             const totalFree = rows.reduce((sum, row) => sum + row.free_places, 0);
             const totalOccupied = rows.reduce((sum, row) => sum + row.occupied_places, 0);
             const totalPlaces = rows.reduce((sum, row) => sum + row.total_places, 0);
             
-            html += '</tbody></table>';
-            html += `<h3>ИТОГО: Всего мест: ${totalPlaces}, Занято: ${totalOccupied}, Свободно: ${totalFree}</h3>`;
+            summary = `
+                <div class="summary">
+                    <p><strong>ИТОГО:</strong> Всего мест: ${totalPlaces}, Занято: ${totalOccupied}, Свободно: ${totalFree}</p>
+                </div>
+            `;
             break;
             
         case 'queue':
-            html += '<h1>ОТЧЕТ ОБ ОЧЕРЕДИ НА ЗАСЕЛЕНИЕ</h1>';
-            html += `<p>Дата формирования: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}</p>`;
-            html += '<table><thead><tr><th>Позиция</th><th>ФИО</th><th>Доход на члена семьи</th><th>Средний балл</th><th>Общественная нагрузка</th><th>Дата заявки</th></tr></thead><tbody>';
+            title = 'ОТЧЕТ ОБ ОЧЕРЕДИ НА ЗАСЕЛЕНИЕ';
+            headers = `
+                <tr>
+                    <th>Позиция</th>
+                    <th>ФИО</th>
+                    <th>Доход на члена семьи</th>
+                    <th>Средний балл</th>
+                    <th>Общественная нагрузка</th>
+                    <th>Дата заявки</th>
+                </tr>
+            `;
             
             rows.forEach(row => {
                 const social = row.social_activity ? 'Да' : 'Нет';
                 const date = new Date(row.application_date).toLocaleDateString();
-                html += `<tr><td>${row.queue_position}</td><td>${row.full_name}</td><td>${row.income_per_member.toFixed(2)}</td><td>${row.average_grade}</td><td>${social}</td><td>${date}</td></tr>`;
+                tableRows += `
+                    <tr>
+                        <td>${row.queue_position}</td>
+                        <td>${row.full_name}</td>
+                        <td>${row.income_per_member.toFixed(2)}</td>
+                        <td>${row.average_grade}</td>
+                        <td>${social}</td>
+                        <td>${date}</td>
+                    </tr>
+                `;
             });
             
-            html += '</tbody></table>';
-            html += `<h3>ИТОГО: ${rows.length} студентов в очереди</h3>`;
+            summary = `<div class="summary"><p><strong>ИТОГО:</strong> ${rows.length} студентов в очереди</p></div>`;
             break;
             
         case 'accommodated':
-            html += '<h1>ОТЧЕТ О ЗАСЕЛЕННЫХ СТУДЕНТАХ</h1>';
-            html += `<p>Дата формирования: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}</p>`;
-            html += '<table><thead><tr><th>ФИО</th><th>Средний балл</th><th>Общественная нагрузка</th><th>Дата заявки</th><th>Общежитие</th><th>Тип общежития</th></tr></thead><tbody>';
+            title = 'ОТЧЕТ О ЗАСЕЛЕННЫХ СТУДЕНТАХ';
+            headers = `
+                <tr>
+                    <th>ФИО</th>
+                    <th>Средний балл</th>
+                    <th>Общественная нагрузка</th>
+                    <th>Дата заявки</th>
+                    <th>Общежитие</th>
+                    <th>Тип общежития</th>
+                </tr>
+            `;
             
             rows.forEach(row => {
                 const social = row.social_activity ? 'Да' : 'Нет';
                 const date = new Date(row.application_date).toLocaleDateString();
                 const dormType = row.dormitory_type === 'family' ? 'Семейное' : 'Несемейное';
-                html += `<tr><td>${row.full_name}</td><td>${row.average_grade}</td><td>${social}</td><td>${date}</td><td>${row.dormitory_name || 'Нет'}</td><td>${dormType}</td></tr>`;
+                tableRows += `
+                    <tr>
+                        <td>${row.full_name}</td>
+                        <td>${row.average_grade}</td>
+                        <td>${social}</td>
+                        <td>${date}</td>
+                        <td>${row.dormitory_name || 'Нет'}</td>
+                        <td>${dormType}</td>
+                    </tr>
+                `;
             });
             
-            html += '</tbody></table>';
-            html += `<h3>ИТОГО: ${rows.length} студентов заселено</h3>`;
+            summary = `<div class="summary"><p><strong>ИТОГО:</strong> ${rows.length} студентов заселено</p></div>`;
             break;
     }
     
-    html += '</body></html>';
-    return html;
+    return `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <style>
+        /* Стили для печати */
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                font-size: 12pt;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+            
+            table {
+                page-break-inside: auto;
+            }
+            
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            
+            thead {
+                display: table-header-group;
+            }
+            
+            tfoot {
+                display: table-footer-group;
+            }
+            
+            .print-btn {
+                display: none !important;
+            }
+        }
+        
+        /* Общие стили */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            line-height: 1.4;
+            color: #000;
+            background-color: #fff;
+            margin: 20px;
+            font-size: 14px;
+        }
+        
+        .report-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #000;
+        }
+        
+        .report-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+        .report-date {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            border: 1px solid #000;
+        }
+        
+        th {
+            background-color: #f0f0f0;
+            border: 1px solid #000;
+            padding: 8px 5px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        td {
+            border: 1px solid #000;
+            padding: 6px 5px;
+            font-size: 12px;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .summary {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #000;
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        /* Кнопки управления (видны только на экране) */
+        .print-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #fff;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .print-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 5px;
+        }
+        
+        .print-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .back-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .back-btn:hover {
+            background-color: #545b62;
+        }
+        
+        /* Для сводного отчета */
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 30px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #000;
+            text-transform: uppercase;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Панель управления для печати (не печатается) -->
+    <div class="print-controls no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Печать</button>
+        <button class="back-btn" onclick="window.close()">✖️ Закрыть</button>
+    </div>
+    
+    <div class="report-header">
+        <div class="report-title">${title}</div>
+        <div class="report-date">Дата формирования: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}</div>
+    </div>
+    
+    <table>
+        <thead>
+            ${headers}
+        </thead>
+        <tbody>
+            ${tableRows}
+        </tbody>
+    </table>
+    
+    ${summary}
+    
+    <div class="footer">
+        <p>Сгенерировано системой распределения студентов</p>
+        <p>Файл: ${reportType}.html | Дата: ${now.toLocaleDateString()}</p>
+    </div>
+    
+    <script>
+        // Автоматически предлагаем печать при открытии
+        window.onload = function() {
+            // Можно раскомментировать, чтобы автоматически открывать диалог печати
+            // setTimeout(function() { window.print(); }, 1000);
+        };
+        
+        // Добавляем обработчик клавиши Ctrl+P
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+        });
+    </script>
+</body>
+</html>
+    `;
 }
 
 // Генерация всех отчетов в TXT
@@ -616,7 +840,6 @@ function generateAllReportsTxt(results) {
     const now = new Date();
     report += `Дата формирования: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}\n\n`;
     
-    // Отчет о свободных местах
     if (results['free-places']) {
         report += '1. ОТЧЕТ О СВОБОДНЫХ МЕСТАХ В ОБЩЕЖИТИЯХ\n';
         report += '========================================\n';
@@ -632,7 +855,6 @@ function generateAllReportsTxt(results) {
         report += `ИТОГО: Всего мест: ${totalPlaces}, Занято: ${totalOccupied}, Свободно: ${totalFree}\n\n`;
     }
     
-    // Отчет об очереди
     if (results['queue']) {
         report += '2. ОТЧЕТ ОБ ОЧЕРЕДИ НА ЗАСЕЛЕНИЕ\n';
         report += '================================\n';
@@ -644,7 +866,6 @@ function generateAllReportsTxt(results) {
         report += `ИТОГО: ${results['queue'].length} студентов в очереди\n\n`;
     }
     
-    // Отчет о заселенных студентах
     if (results['accommodated']) {
         report += '3. ОТЧЕТ О ЗАСЕЛЕННЫХ СТУДЕНТАХ\n';
         report += '=============================\n';
@@ -663,81 +884,388 @@ function generateAllReportsTxt(results) {
     return report;
 }
 
-// Генерация всех отчетов в DOCX
-function generateAllReportsDocx(results) {
-    let html = '<!DOCTYPE html><html><head><meta charset="UTF-8">';
-    html += '<style>body { font-family: Arial, sans-serif; } h1 { color: #2c3e50; } h2 { color: #3498db; margin-top: 30px; } table { border-collapse: collapse; width: 100%; margin-bottom: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; } .summary { background-color: #f8f9fa; padding: 10px; border-left: 4px solid #3498db; margin: 20px 0; }</style>';
-    html += '</head><body>';
-    
+// Генерация всех отчетов в HTML
+function generateAllReportsHtml(results) {
     const now = new Date();
-    html += `<h1>СВОДНЫЙ ОТЧЕТ ПО СИСТЕМЕ РАСПРЕДЕЛЕНИЯ СТУДЕНТОВ</h1>`;
-    html += `<p>Дата формирования: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}</p>`;
     
-    // Отчет о свободных местах
+    let freePlacesRows = '';
+    let queueRows = '';
+    let accommodatedRows = '';
+    
+    let freePlacesSummary = '';
+    let queueSummary = '';
+    let accommodatedSummary = '';
+    
+    // Генерация строк для свободных мест
     if (results['free-places']) {
-        html += '<h2>1. Отчет о свободных местах в общежитиях</h2>';
-        html += '<table><thead><tr><th>Общежитие</th><th>Тип</th><th>Всего мест</th><th>Занято</th><th>Свободно</th></tr></thead><tbody>';
-        
         results['free-places'].forEach(row => {
             const type = row.type === 'family' ? 'Семейное' : 'Несемейное';
-            html += `<tr><td>${row.name}</td><td>${type}</td><td>${row.total_places}</td><td>${row.occupied_places}</td><td>${row.free_places}</td></tr>`;
+            freePlacesRows += `
+                <tr>
+                    <td>${row.name}</td>
+                    <td>${type}</td>
+                    <td>${row.total_places}</td>
+                    <td>${row.occupied_places}</td>
+                    <td>${row.free_places}</td>
+                </tr>
+            `;
         });
         
         const totalFree = results['free-places'].reduce((sum, row) => sum + row.free_places, 0);
         const totalOccupied = results['free-places'].reduce((sum, row) => sum + row.occupied_places, 0);
         const totalPlaces = results['free-places'].reduce((sum, row) => sum + row.total_places, 0);
         
-        html += '</tbody></table>';
-        html += `<div class="summary"><strong>ИТОГО:</strong> Всего мест: ${totalPlaces}, Занято: ${totalOccupied}, Свободно: ${totalFree}</div>`;
+        freePlacesSummary = `
+            <p><strong>ИТОГО:</strong> Всего мест: ${totalPlaces}, Занято: ${totalOccupied}, Свободно: ${totalFree}</p>
+        `;
     }
     
-    // Отчет об очереди
+    // Генерация строк для очереди
     if (results['queue']) {
-        html += '<h2>2. Отчет об очереди на заселение</h2>';
-        html += '<table><thead><tr><th>Позиция</th><th>ФИО</th><th>Доход на члена семьи</th><th>Средний балл</th><th>Общественная нагрузка</th><th>Дата заявки</th></tr></thead><tbody>';
-        
         results['queue'].forEach(row => {
             const social = row.social_activity ? 'Да' : 'Нет';
             const date = new Date(row.application_date).toLocaleDateString();
-            html += `<tr><td>${row.queue_position}</td><td>${row.full_name}</td><td>${row.income_per_member.toFixed(2)}</td><td>${row.average_grade}</td><td>${social}</td><td>${date}</td></tr>`;
+            queueRows += `
+                <tr>
+                    <td>${row.queue_position}</td>
+                    <td>${row.full_name}</td>
+                    <td>${row.income_per_member.toFixed(2)}</td>
+                    <td>${row.average_grade}</td>
+                    <td>${social}</td>
+                    <td>${date}</td>
+                </tr>
+            `;
         });
         
-        html += '</tbody></table>';
-        html += `<div class="summary"><strong>ИТОГО:</strong> ${results['queue'].length} студентов в очереди</div>`;
+        queueSummary = `<p><strong>ИТОГО:</strong> ${results['queue'].length} студентов в очереди</p>`;
     }
     
-    // Отчет о заселенных студентах
+    // Генерация строк для заселенных
     if (results['accommodated']) {
-        html += '<h2>3. Отчет о заселенных студентах</h2>';
-        html += '<table><thead><tr><th>ФИО</th><th>Средний балл</th><th>Общественная нагрузка</th><th>Дата заявки</th><th>Общежитие</th><th>Тип общежития</th></tr></thead><tbody>';
-        
         results['accommodated'].forEach(row => {
             const social = row.social_activity ? 'Да' : 'Нет';
             const date = new Date(row.application_date).toLocaleDateString();
             const dormType = row.dormitory_type === 'family' ? 'Семейное' : 'Несемейное';
-            html += `<tr><td>${row.full_name}</td><td>${row.average_grade}</td><td>${social}</td><td>${date}</td><td>${row.dormitory_name || 'Нет'}</td><td>${dormType}</td></tr>`;
+            accommodatedRows += `
+                <tr>
+                    <td>${row.full_name}</td>
+                    <td>${row.average_grade}</td>
+                    <td>${social}</td>
+                    <td>${date}</td>
+                    <td>${row.dormitory_name || 'Нет'}</td>
+                    <td>${dormType}</td>
+                </tr>
+            `;
         });
         
-        html += '</tbody></table>';
-        html += `<div class="summary"><strong>ИТОГО:</strong> ${results['accommodated'].length} студентов заселено</div>`;
+        accommodatedSummary = `<p><strong>ИТОГО:</strong> ${results['accommodated'].length} студентов заселено</p>`;
     }
     
-    html += '<hr>';
-    html += `<p style="text-align: center; color: #7f8c8d; font-size: 0.9em;">Отчет сгенерирован автоматически системой распределения студентов</p>`;
-    html += '</body></html>';
-    return html;
+    return `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сводный отчет</title>
+    <style>
+        /* Стили для печати */
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                font-size: 12pt;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+            
+            table {
+                page-break-inside: auto;
+            }
+            
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            
+            thead {
+                display: table-header-group;
+            }
+            
+            tfoot {
+                display: table-footer-group;
+            }
+            
+            .print-btn {
+                display: none !important;
+            }
+            
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+        
+        /* Общие стили */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            line-height: 1.4;
+            color: #000;
+            background-color: #fff;
+            margin: 20px;
+            font-size: 14px;
+        }
+        
+        .report-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #000;
+        }
+        
+        .main-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+        .report-date {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .section {
+            margin-top: 30px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #000;
+            text-transform: uppercase;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            border: 1px solid #000;
+        }
+        
+        th {
+            background-color: #f0f0f0;
+            border: 1px solid #000;
+            padding: 8px 5px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        td {
+            border: 1px solid #000;
+            padding: 6px 5px;
+            font-size: 12px;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .summary {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #000;
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        /* Кнопки управления (видны только на экране) */
+        .print-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #fff;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .print-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 5px;
+        }
+        
+        .print-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .back-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .back-btn:hover {
+            background-color: #545b62;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Панель управления для печати (не печатается) -->
+    <div class="print-controls no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Печать</button>
+        <button class="back-btn" onclick="window.close()">✖️ Закрыть</button>
+    </div>
+    
+    <div class="report-header">
+        <div class="main-title">СВОДНЫЙ ОТЧЕТ ПО СИСТЕМЕ РАСПРЕДЕЛЕНИЯ СТУДЕНТОВ</div>
+        <div class="report-date">Дата формирования: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}</div>
+    </div>
+    
+    ${results['free-places'] ? `
+    <div class="section">
+        <div class="section-title">1. ОТЧЕТ О СВОБОДНЫХ МЕСТАХ В ОБЩЕЖИТИЯХ</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Общежитие</th>
+                    <th>Тип</th>
+                    <th>Всего мест</th>
+                    <th>Занято</th>
+                    <th>Свободно</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${freePlacesRows}
+            </tbody>
+        </table>
+        <div class="summary">
+            ${freePlacesSummary}
+        </div>
+    </div>
+    ` : ''}
+    
+    ${results['queue'] ? `
+    <div class="page-break"></div>
+    <div class="section">
+        <div class="section-title">2. ОТЧЕТ ОБ ОЧЕРЕДИ НА ЗАСЕЛЕНИЕ</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Позиция</th>
+                    <th>ФИО</th>
+                    <th>Доход на члена семьи</th>
+                    <th>Средний балл</th>
+                    <th>Общественная нагрузка</th>
+                    <th>Дата заявки</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${queueRows}
+            </tbody>
+        </table>
+        <div class="summary">
+            ${queueSummary}
+        </div>
+    </div>
+    ` : ''}
+    
+    ${results['accommodated'] ? `
+    <div class="page-break"></div>
+    <div class="section">
+        <div class="section-title">3. ОТЧЕТ О ЗАСЕЛЕННЫХ СТУДЕНТАХ</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>ФИО</th>
+                    <th>Средний балл</th>
+                    <th>Общественная нагрузка</th>
+                    <th>Дата заявки</th>
+                    <th>Общежитие</th>
+                    <th>Тип общежития</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${accommodatedRows}
+            </tbody>
+        </table>
+        <div class="summary">
+            ${accommodatedSummary}
+        </div>
+    </div>
+    ` : ''}
+    
+    <div class="footer">
+        <p>Сгенерировано системой распределения студентов</p>
+        <p>Полный сводный отчет | Дата: ${now.toLocaleDateString()}</p>
+    </div>
+    
+    <script>
+        // Автоматически предлагаем печать при открытии
+        window.onload = function() {
+            // Можно раскомментировать, чтобы автоматически открывать диалог печати
+            // setTimeout(function() { window.print(); }, 1000);
+        };
+        
+        // Добавляем обработчик клавиши Ctrl+P
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+        });
+    </script>
+</body>
+</html>
+    `;
 }
 
 // Регистрация новой заявки
 app.post('/api/students', (req, res) => {
     const { full_name, family_income, family_members, average_grade, social_activity } = req.body;
     
-    // Расширенная валидация полей
     if (!full_name || !family_income || !family_members || !average_grade) {
         return res.status(400).json({ error: 'Все обязательные поля должны быть заполнены' });
     }
     
-    // Проверка ФИО
     if (typeof full_name !== 'string' || full_name.trim().length < 2) {
         return res.status(400).json({ error: 'ФИО должно содержать минимум 2 символа' });
     }
@@ -746,7 +1274,6 @@ app.post('/api/students', (req, res) => {
         return res.status(400).json({ error: 'ФИО слишком длинное (макс. 100 символов)' });
     }
     
-    // Проверка дохода семьи
     const income = parseFloat(family_income);
     if (isNaN(income) || income < 0) {
         return res.status(400).json({ error: 'Доход семьи должен быть положительным числом' });
@@ -756,19 +1283,16 @@ app.post('/api/students', (req, res) => {
         return res.status(400).json({ error: 'Доход семьи слишком большой (макс. 10,000,000)' });
     }
     
-    // Проверка количества членов семьи
     const members = parseInt(family_members);
     if (isNaN(members) || members < 1 || members > 20) {
         return res.status(400).json({ error: 'Количество членов семьи должно быть от 1 до 20' });
     }
     
-    // Проверка среднего балла
     const grade = parseFloat(average_grade);
     if (isNaN(grade) || grade < 0 || grade > 10) {
         return res.status(400).json({ error: 'Средний балл должен быть от 0 до 10' });
     }
     
-    // Проверка общественной нагрузки
     const social = social_activity ? 1 : 0;
     
     const query = `
@@ -805,7 +1329,6 @@ app.post('/api/students/:id/accommodate', (req, res) => {
         return res.status(400).json({ error: 'Необходимо указать общежитие' });
     }
     
-    // Проверяем, есть ли свободные места
     db.get("SELECT total_places, occupied_places FROM dormitories WHERE id = ?", [dormitory_id], (err, dorm) => {
         if (err) {
             res.status(500).json({ error: err.message });
@@ -820,7 +1343,6 @@ app.post('/api/students/:id/accommodate', (req, res) => {
             return res.status(400).json({ error: 'В выбранном общежитии нет свободных мест' });
         }
         
-        // Обновляем статус студента и занимаем место
         db.serialize(() => {
             db.run("UPDATE students SET status = 'accommodated', dormitory_id = ? WHERE id = ?", 
                    [dormitory_id, studentId]);
@@ -846,7 +1368,6 @@ app.post('/api/students/:id/evict', (req, res) => {
             return res.status(404).json({ error: 'Студент не найден' });
         }
         
-        // Освобождаем место и обновляем статус студента
         db.serialize(() => {
             if (student.dormitory_id) {
                 db.run("UPDATE dormitories SET occupied_places = occupied_places - 1 WHERE id = ?", [student.dormitory_id]);
@@ -859,77 +1380,49 @@ app.post('/api/students/:id/evict', (req, res) => {
     });
 });
 
-// Получение следующего кандидата для заселения
+// Получение следующего кандидата для заселения - ИСПРАВЛЕННЫЙ
 app.get('/api/students/next-candidate', (req, res) => {
-    db.get(`
-        SELECT s.*, 
-               (s.family_income / s.family_members) as income_per_member,
-               (s.average_grade * 100 + 
-                CASE WHEN s.social_activity THEN 50 ELSE 0 END +
-                CASE 
-                    WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                    WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                    WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                    WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                    ELSE 0
-                END +
-                (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))
-               ) as priority_score
+    db.all(`
+        SELECT s.*,
+               (s.family_income / s.family_members) as income_per_member
         FROM students s
         WHERE s.status = 'waiting'
-        ORDER BY 
-            priority_score DESC,
-            s.application_date ASC
-        LIMIT 1
-    `, (err, row) => {
+    `, (err, waitingStudents) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
-        res.json(row || {});
-    });
-});
-
-// Получение детальной информации о приоритете студента (для отладки)
-app.get('/api/students/:id/priority-info', (req, res) => {
-    const studentId = req.params.id;
-    
-    db.get(`
-        SELECT 
-            s.*,
-            (s.family_income / s.family_members) as income_per_member,
-            (s.average_grade * 100) as grade_score,
-            (CASE WHEN s.social_activity THEN 50 ELSE 0 END) as social_score,
-            (CASE 
-                WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                ELSE 0
-            END) as income_score,
-            (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER)) as date_score,
-            (s.average_grade * 100 + 
-             CASE WHEN s.social_activity THEN 50 ELSE 0 END +
-             CASE 
-                 WHEN (s.family_income / s.family_members) <= 100 THEN 40
-                 WHEN (s.family_income / s.family_members) <= 300 THEN 30
-                 WHEN (s.family_income / s.family_members) <= 500 THEN 20
-                 WHEN (s.family_income / s.family_members) <= 1000 THEN 10
-                 ELSE 0
-             END +
-             (30 - CAST((julianday('now') - julianday(s.application_date)) AS INTEGER))
-            ) as total_priority_score
-        FROM students s
-        WHERE s.id = ?
-    `, [studentId], (err, row) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
+        
+        if (waitingStudents.length === 0) {
+            return res.json({});
         }
-        if (!row) {
-            return res.status(404).json({ error: 'Студент не найден' });
-        }
-        res.json(row);
+        
+        waitingStudents.forEach(student => {
+            const studentPriority = calculatePriority(student);
+            
+            let higherPriorityCount = 0;
+            waitingStudents.forEach(s => {
+                if (s.id === student.id) return;
+                
+                const sPriority = calculatePriority(s);
+                if (sPriority > studentPriority) {
+                    higherPriorityCount++;
+                } else if (sPriority === studentPriority) {
+                    const sDate = new Date(s.application_date);
+                    const studentDate = new Date(student.application_date);
+                    if (sDate < studentDate) {
+                        higherPriorityCount++;
+                    }
+                }
+            });
+            
+            student.queue_position = higherPriorityCount + 1;
+            student.priority_score = studentPriority;
+        });
+        
+        const nextCandidate = waitingStudents.find(s => s.queue_position === 1);
+        
+        res.json(nextCandidate || waitingStudents[0] || {});
     });
 });
 
@@ -942,7 +1435,6 @@ app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Запуск сервера
 app.listen(PORT, () => {
     console.log(`Сервер запущен на порту ${PORT}`);
     console.log(`Откройте http://localhost:${PORT} в браузере`);

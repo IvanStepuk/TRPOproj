@@ -1,28 +1,19 @@
 let currentSession = null;
-let currentFilter = 'all'; // all, accommodated, waiting
+let currentFilter = 'all';
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
     showLoginForm();
     
-    // Обработчик формы авторизации
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    
-    // Обработчик формы заявки
     document.getElementById('applicationForm').addEventListener('submit', handleApplication);
-    
-    // Обработчик формы заселения
     document.getElementById('accommodateForm').addEventListener('submit', handleAccommodation);
-    
-    // Обработчик выхода
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
     
-    // Обработчик изменения фильтра
     document.getElementById('studentFilter').addEventListener('change', function() {
         setFilter(this.value);
     });
     
-    // Добавляем валидацию при вводе в поля формы
     setupFormValidation();
 });
 
@@ -30,25 +21,21 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupFormValidation() {
     const form = document.getElementById('applicationForm');
     
-    // Валидация ФИО
     const fullNameInput = document.getElementById('fullName');
     fullNameInput.addEventListener('input', function() {
         validateField(this, validateFullName);
     });
     
-    // Валидация дохода
     const familyIncomeInput = document.getElementById('familyIncome');
     familyIncomeInput.addEventListener('input', function() {
         validateField(this, validateIncome);
     });
     
-    // Валидация количества членов семьи
     const familyMembersInput = document.getElementById('familyMembers');
     familyMembersInput.addEventListener('input', function() {
         validateField(this, validateFamilyMembers);
     });
     
-    // Валидация среднего балла
     const averageGradeInput = document.getElementById('averageGrade');
     averageGradeInput.addEventListener('input', function() {
         validateField(this, validateAverageGrade);
@@ -163,7 +150,6 @@ function handleLogin(e) {
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
     
-    // Проверка на пустые поля
     if (!username || !password) {
         showError('Пожалуйста, введите имя пользователя и пароль');
         return;
@@ -187,13 +173,13 @@ function handleLogin(e) {
             showAdminPanel();
         } else {
             showError('Ошибка авторизации: ' + data.error);
-            document.getElementById('password').value = ''; // Очищаем пароль
+            document.getElementById('password').value = '';
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
         showError('Ошибка при авторизации');
-        document.getElementById('password').value = ''; // Очищаем пароль
+        document.getElementById('password').value = '';
     });
 }
 
@@ -203,10 +189,8 @@ function showAdminPanel() {
     document.getElementById('adminPanel').style.display = 'block';
     document.getElementById('logoutBtn').style.display = 'block';
     
-    // Очищаем форму авторизации
     document.getElementById('loginForm').reset();
     
-    // Загружаем начальные данные
     showSection('students');
     loadDormitories();
 }
@@ -220,21 +204,17 @@ function handleLogout() {
 
 // Переключение между секциями
 function showSection(sectionName) {
-    // Скрываем все секции
     document.querySelectorAll('.section').forEach(section => {
         section.style.display = 'none';
     });
     
-    // Показываем выбранную секцию
     document.getElementById(sectionName + 'Section').style.display = 'block';
     
-    // Загружаем данные для секции
     switch(sectionName) {
         case 'students':
             loadStudents();
             break;
         case 'reports':
-            // Очищаем результаты отчетов
             document.getElementById('reportResults').innerHTML = '';
             break;
         case 'export':
@@ -247,7 +227,6 @@ function showSection(sectionName) {
 function loadStudents() {
     let url = '/api/students';
     
-    // Добавляем фильтр по статусу
     if (currentFilter !== 'all') {
         url += `?status=${currentFilter}`;
     }
@@ -286,13 +265,11 @@ function displayStudents(students) {
         return;
     }
     
-    // Группируем студентов по статусу для лучшей организации
     const accommodated = students.filter(s => s.status === 'accommodated');
     const waiting = students.filter(s => s.status === 'waiting');
     
     let html = '';
     
-    // Если показываем всех или только в очереди и есть ожидающие
     if ((currentFilter === 'all' || currentFilter === 'waiting') && waiting.length > 0) {
         html += `<div class="status-group">
                     <h3><span class="status-badge waiting">В очереди</span> (${waiting.length} чел.)</h3>
@@ -305,7 +282,6 @@ function displayStudents(students) {
         html += `</div></div>`;
     }
     
-    // Если показываем всех или только заселенных и есть заселенные
     if ((currentFilter === 'all' || currentFilter === 'accommodated') && accommodated.length > 0) {
         html += `<div class="status-group">
                     <h3><span class="status-badge accommodated">Заселены</span> (${accommodated.length} чел.)</h3>
@@ -323,6 +299,8 @@ function displayStudents(students) {
 
 // Создание карточки студента
 function createStudentCard(student) {
+    const incomePerMember = student.family_income / student.family_members;
+    
     return `
         <div class="student-card ${student.status}">
             <div class="student-header">
@@ -335,7 +313,7 @@ function createStudentCard(student) {
             <div class="student-info">
                 <div class="info-row">
                     <span class="info-label">Средний доход на члена семьи:</span>
-                    <span class="info-value">${student.income_per_member ? student.income_per_member.toFixed(2) + ' руб.' : 'N/A'}</span>
+                    <span class="info-value">${incomePerMember.toFixed(2)} руб.</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Средний балл:</span>
@@ -352,10 +330,10 @@ function createStudentCard(student) {
                     <span class="info-label">Общежитие:</span>
                     <span class="info-value">${student.dormitory_name}</span>
                 </div>` : ''}
-                ${student.queue_position ? `
+                ${student.status === 'waiting' ? `
                 <div class="info-row">
                     <span class="info-label">Позиция в очереди:</span>
-                    <span class="info-value">${student.queue_position}</span>
+                    <span class="info-value">${student.queue_position || 'Рассчитывается...'}</span>
                 </div>` : ''}
             </div>
             
@@ -391,12 +369,11 @@ function loadDormitories() {
 
 // Открытие модального окна для заселения
 function openAccommodateModal(studentId) {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
     document.getElementById('accommodateStudentId').value = studentId;
     document.getElementById('accommodateModal').style.display = 'flex';
-    loadDormitories(); // Обновляем список общежитий
+    loadDormitories();
 }
 
 // Закрытие модального окна
@@ -418,7 +395,6 @@ function checkAuth() {
 function handleAccommodation(e) {
     e.preventDefault();
     
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
     const studentId = document.getElementById('accommodateStudentId').value;
@@ -443,7 +419,7 @@ function handleAccommodation(e) {
         if (data.success) {
             showSuccess(data.message);
             closeModal();
-            loadStudents(); // Обновляем список студентов
+            loadStudents();
         } else {
             showError('Ошибка: ' + data.error);
         }
@@ -456,7 +432,6 @@ function handleAccommodation(e) {
 
 // Выселение студента
 function evictStudent(studentId) {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
     if (!confirm('Вы уверены, что хотите выселить этого студента?')) {
@@ -470,7 +445,7 @@ function evictStudent(studentId) {
     .then(data => {
         if (data.success) {
             showSuccess(data.message);
-            loadStudents(); // Обновляем список студентов
+            loadStudents();
         } else {
             showError('Ошибка: ' + data.error);
         }
@@ -483,7 +458,6 @@ function evictStudent(studentId) {
 
 // Загрузка следующего кандидата для заселения
 function loadNextCandidate() {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
     fetch('/api/students/next-candidate')
@@ -505,10 +479,8 @@ function loadNextCandidate() {
 function handleApplication(e) {
     e.preventDefault();
     
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
-    // Валидация формы
     if (!validateForm()) {
         showError('Пожалуйста, исправьте ошибки в форме');
         return;
@@ -534,7 +506,7 @@ function handleApplication(e) {
         if (data.success) {
             showSuccess(data.message);
             e.target.reset();
-            loadStudents(); // Обновляем список студентов
+            loadStudents();
         } else {
             showError('Ошибка: ' + data.error);
         }
@@ -547,7 +519,6 @@ function handleApplication(e) {
 
 // Загрузка отчета о свободных местах
 function loadFreePlacesReport() {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
     fetch('/api/reports/free-places')
@@ -563,7 +534,6 @@ function loadFreePlacesReport() {
 
 // Загрузка отчета об очереди
 function loadQueueReport() {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
     fetch('/api/reports/queue')
@@ -579,7 +549,6 @@ function loadQueueReport() {
 
 // Загрузка отчета о заселенных студентах
 function loadAccommodatedReport() {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
     fetch('/api/reports/accommodated')
@@ -609,7 +578,7 @@ function displayReport(data, reportType) {
             tableHTML = `
                 <div class="export-buttons">
                     <button onclick="exportReport('free-places', 'txt')"> Экспорт в TXT</button>
-                    <button onclick="exportReport('free-places', 'docx')"> Экспорт в HTML</button>
+                    <button onclick="exportReport('free-places', 'html')"> Экспорт в HTML</button>
                 </div>
                 <table class="report-table">
                     <thead>
@@ -640,7 +609,7 @@ function displayReport(data, reportType) {
             tableHTML = `
                 <div class="export-buttons">
                     <button onclick="exportReport('queue', 'txt')"> Экспорт в TXT</button>
-                    <button onclick="exportReport('queue', 'docx')"> Экспорт в HTML</button>
+                    <button onclick="exportReport('queue', 'html')"> Экспорт в HTML</button>
                 </div>
                 <table class="report-table">
                     <thead>
@@ -673,7 +642,7 @@ function displayReport(data, reportType) {
             tableHTML = `
                 <div class="export-buttons">
                     <button onclick="exportReport('accommodated', 'txt')">Экспорт в TXT</button>
-                    <button onclick="exportReport('accommodated', 'docx')">Экспорт в HTML</button>
+                    <button onclick="exportReport('accommodated', 'html')">Экспорт в HTML</button>
                 </div>
                 <table class="report-table">
                     <thead>
@@ -706,25 +675,16 @@ function displayReport(data, reportType) {
     container.innerHTML = tableHTML;
 }
 
-// ============================
-// ФУНКЦИИ ЭКСПОРТА
-// ============================
-
 // Экспорт отчета
 function exportReport(reportType, format) {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
-    // Получаем отображаемое имя формата
-    const displayFormat = format === 'docx' ? 'HTML' : format.toUpperCase();
+    const displayFormat = format.toUpperCase();
     
-    // Показываем уведомление о начале экспорта
     showExportNotification(`Начинается экспорт отчета "${getReportName(reportType)}" в формате ${displayFormat}...`);
     
-    // Создаем URL для экспорта
     const url = `/api/export/${reportType}/${format}`;
     
-    // Скачиваем файл
     const a = document.createElement('a');
     a.href = url;
     a.download = `report_${reportType}_${new Date().toISOString().slice(0,10)}.${format}`;
@@ -732,7 +692,6 @@ function exportReport(reportType, format) {
     a.click();
     document.body.removeChild(a);
     
-    // Показываем уведомление об успешном экспорте
     setTimeout(() => {
         showExportNotification(`Отчет "${getReportName(reportType)}" успешно экспортирован в формате ${displayFormat}!`, 'success');
     }, 500);
@@ -740,19 +699,14 @@ function exportReport(reportType, format) {
 
 // Экспорт всех отчетов
 function exportAllReports(format) {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
-    // Получаем отображаемое имя формата
-    const displayFormat = format === 'docx' ? 'HTML' : format.toUpperCase();
+    const displayFormat = format.toUpperCase();
     
-    // Показываем уведомление о начале экспорта
     showExportNotification(`Начинается экспорт всех отчетов в формате ${displayFormat}...`);
     
-    // Создаем URL для экспорта
     const url = `/api/export/all/${format}`;
     
-    // Скачиваем файл
     const a = document.createElement('a');
     a.href = url;
     a.download = `all_reports_${new Date().toISOString().slice(0,10)}.${format}`;
@@ -760,7 +714,6 @@ function exportAllReports(format) {
     a.click();
     document.body.removeChild(a);
     
-    // Показываем уведомление об успешном экспорте
     setTimeout(() => {
         showExportNotification(`Все отчеты успешно экспортированы в формате ${displayFormat}!`, 'success');
     }, 500);
@@ -779,7 +732,6 @@ function getReportName(reportType) {
 
 // Показ уведомления об экспорте
 function showExportNotification(message, type = 'info') {
-    // Создаем элемент уведомления
     const notification = document.createElement('div');
     notification.className = `export-notification ${type}`;
     notification.style.cssText = `
@@ -804,7 +756,6 @@ function showExportNotification(message, type = 'info') {
     
     document.body.appendChild(notification);
     
-    // Удаляем уведомление через 3 секунды
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => {
@@ -817,10 +768,8 @@ function showExportNotification(message, type = 'info') {
 
 // Загрузка статистики для экспорта
 function loadExportStats() {
-    // Проверяем авторизацию
     if (!checkAuth()) return;
     
-    // Используем несколько запросов для получения статистики
     Promise.all([
         fetch('/api/students').then(r => r.json()),
         fetch('/api/dormitories').then(r => r.json()),
@@ -832,7 +781,6 @@ function loadExportStats() {
         const waitingStudents = queue.length;
         const accommodatedStudents = accommodated.length;
         
-        // Рассчитываем общую статистику по общежитиям
         let totalPlaces = 0;
         let occupiedPlaces = 0;
         let freePlaces = 0;
@@ -843,7 +791,6 @@ function loadExportStats() {
             freePlaces += (dorm.total_places - dorm.occupied_places);
         });
         
-        // Отображаем статистику
         const statsHTML = `
             <div class="stats-grid">
                 <div class="stat-card">
@@ -881,19 +828,25 @@ function loadExportStats() {
             </div>
         `;
         
-        document.getElementById('statsContent').innerHTML = statsHTML;
+        const statsContent = document.getElementById('statsContent');
+        if (statsContent) {
+            statsContent.innerHTML = statsHTML;
+        }
         
-        // Обновляем время последнего экспорта
         const lastExport = localStorage.getItem('lastExport');
         if (lastExport) {
-            document.getElementById('lastExportTime').textContent = 
-                new Date(lastExport).toLocaleString();
+            const lastExportTime = document.getElementById('lastExportTime');
+            if (lastExportTime) {
+                lastExportTime.textContent = new Date(lastExport).toLocaleString();
+            }
         }
     })
     .catch(error => {
         console.error('Ошибка при загрузке статистики:', error);
-        document.getElementById('statsContent').innerHTML = 
-            '<p>Ошибка при загрузке статистики. Пожалуйста, попробуйте позже.</p>';
+        const statsContent = document.getElementById('statsContent');
+        if (statsContent) {
+            statsContent.innerHTML = '<p>Ошибка при загрузке статистики. Пожалуйста, попробуйте позже.</p>';
+        }
     });
 }
 
