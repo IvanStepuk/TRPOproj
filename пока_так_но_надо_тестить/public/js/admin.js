@@ -552,8 +552,8 @@ function displayReport(data, reportType) {
         case 'accommodated':
             tableHTML = `
                 <div class="export-buttons">
-                    <button onclick="exportReport('accommodated', 'txt')">📝 Экспорт в TXT</button>
-                    <button onclick="exportReport('accommodated', 'docx')">📄 Экспорт в HTML</button>
+                    <button onclick="exportReport('accommodated', 'txt')">Экспорт в TXT</button>
+                    <button onclick="exportReport('accommodated', 'docx')">Экспорт в HTML</button>
                 </div>
                 <table class="report-table">
                     <thead>
