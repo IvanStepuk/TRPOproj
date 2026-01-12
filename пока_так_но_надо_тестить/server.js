@@ -732,20 +732,62 @@ function generateAllReportsDocx(results) {
 app.post('/api/students', (req, res) => {
     const { full_name, family_income, family_members, average_grade, social_activity } = req.body;
     
+    // Расширенная валидация полей
     if (!full_name || !family_income || !family_members || !average_grade) {
         return res.status(400).json({ error: 'Все обязательные поля должны быть заполнены' });
     }
+    
+    // Проверка ФИО
+    if (typeof full_name !== 'string' || full_name.trim().length < 2) {
+        return res.status(400).json({ error: 'ФИО должно содержать минимум 2 символа' });
+    }
+    
+    if (full_name.trim().length > 100) {
+        return res.status(400).json({ error: 'ФИО слишком длинное (макс. 100 символов)' });
+    }
+    
+    // Проверка дохода семьи
+    const income = parseFloat(family_income);
+    if (isNaN(income) || income < 0) {
+        return res.status(400).json({ error: 'Доход семьи должен быть положительным числом' });
+    }
+    
+    if (income > 10000000) {
+        return res.status(400).json({ error: 'Доход семьи слишком большой (макс. 10,000,000)' });
+    }
+    
+    // Проверка количества членов семьи
+    const members = parseInt(family_members);
+    if (isNaN(members) || members < 1 || members > 20) {
+        return res.status(400).json({ error: 'Количество членов семьи должно быть от 1 до 20' });
+    }
+    
+    // Проверка среднего балла
+    const grade = parseFloat(average_grade);
+    if (isNaN(grade) || grade < 0 || grade > 10) {
+        return res.status(400).json({ error: 'Средний балл должен быть от 0 до 10' });
+    }
+    
+    // Проверка общественной нагрузки
+    const social = social_activity ? 1 : 0;
     
     const query = `
         INSERT INTO students (full_name, family_income, family_members, average_grade, social_activity)
         VALUES (?, ?, ?, ?, ?)
     `;
     
-    db.run(query, [full_name, family_income, family_members, average_grade, social_activity ? 1 : 0], function(err) {
+    db.run(query, [
+        full_name.trim(),
+        income,
+        members,
+        grade,
+        social
+    ], function(err) {
         if (err) {
-            res.status(500).json({ error: err.message });
-            return;
+            console.error('Ошибка при регистрации заявки:', err);
+            return res.status(500).json({ error: 'Ошибка при регистрации заявки в базе данных' });
         }
+        
         res.json({ 
             success: true, 
             id: this.lastID,

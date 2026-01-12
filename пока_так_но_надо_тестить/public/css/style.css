@@ -822,6 +822,7 @@ button:hover {
 
 .form-group {
     margin-bottom: 20px;
+    position: relative;
 }
 
 .form-label {
@@ -880,11 +881,72 @@ button:hover {
     background-color: #7f8c8d;
 }
 
+/* ========== СТИЛИ ДЛЯ ВАЛИДАЦИИ ========== */
+
+input.error {
+    border-color: #e74c3c !important;
+    background-color: rgba(231, 76, 60, 0.05);
+    animation: shake 0.5s ease-in-out;
+}
+
+.field-error {
+    color: #e74c3c;
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Улучшенные стили для формы */
+#applicationForm input {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    transition: all 0.3s;
+}
+
+#applicationForm input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+}
+
  footer {
-        flex-shrink: 0;
-        margin-top: auto;
-        background-color: #f8f9fa; /* опционально */
-        padding: 10px;
-        text-align: center;
-        border-top: 1px solid #dee2e6; /* опционально */
+    flex-shrink: 0;
+    margin-top: auto;
+    background-color: #f8f9fa;
+    padding: 10px;
+    text-align: center;
+    border-top: 1px solid #dee2e6;
 }

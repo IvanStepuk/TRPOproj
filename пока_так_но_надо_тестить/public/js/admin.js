@@ -21,7 +21,133 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('studentFilter').addEventListener('change', function() {
         setFilter(this.value);
     });
+    
+    // Добавляем валидацию при вводе в поля формы
+    setupFormValidation();
 });
+
+// Настройка валидации полей формы
+function setupFormValidation() {
+    const form = document.getElementById('applicationForm');
+    
+    // Валидация ФИО
+    const fullNameInput = document.getElementById('fullName');
+    fullNameInput.addEventListener('input', function() {
+        validateField(this, validateFullName);
+    });
+    
+    // Валидация дохода
+    const familyIncomeInput = document.getElementById('familyIncome');
+    familyIncomeInput.addEventListener('input', function() {
+        validateField(this, validateIncome);
+    });
+    
+    // Валидация количества членов семьи
+    const familyMembersInput = document.getElementById('familyMembers');
+    familyMembersInput.addEventListener('input', function() {
+        validateField(this, validateFamilyMembers);
+    });
+    
+    // Валидация среднего балла
+    const averageGradeInput = document.getElementById('averageGrade');
+    averageGradeInput.addEventListener('input', function() {
+        validateField(this, validateAverageGrade);
+    });
+}
+
+// Валидация ФИО
+function validateFullName(value) {
+    if (!value || value.trim().length < 2) {
+        return 'ФИО должно содержать минимум 2 символа';
+    }
+    if (value.trim().length > 100) {
+        return 'ФИО слишком длинное (макс. 100 символов)';
+    }
+    return null;
+}
+
+// Валидация дохода
+function validateIncome(value) {
+    const income = parseFloat(value);
+    if (isNaN(income) || income < 0) {
+        return 'Доход должен быть положительным числом';
+    }
+    if (income > 10000000) {
+        return 'Доход слишком большой (макс. 10,000,000)';
+    }
+    return null;
+}
+
+// Валидация количества членов семьи
+function validateFamilyMembers(value) {
+    const members = parseInt(value);
+    if (isNaN(members) || members < 1) {
+        return 'Количество членов семьи должно быть не менее 1';
+    }
+    if (members > 20) {
+        return 'Количество членов семьи должно быть не более 20';
+    }
+    return null;
+}
+
+// Валидация среднего балла
+function validateAverageGrade(value) {
+    const grade = parseFloat(value);
+    if (isNaN(grade)) {
+        return 'Средний балл должен быть числом';
+    }
+    if (grade < 0 || grade > 10) {
+        return 'Средний балл должен быть от 0 до 10';
+    }
+    return null;
+}
+
+// Валидация поля
+function validateField(field, validator) {
+    const error = validator(field.value);
+    const errorElement = field.parentElement.querySelector('.field-error');
+    
+    if (error) {
+        field.classList.add('error');
+        if (errorElement) {
+            errorElement.textContent = error;
+        } else {
+            const errorSpan = document.createElement('span');
+            errorSpan.className = 'field-error';
+            errorSpan.style.cssText = 'color: #e74c3c; font-size: 12px; margin-top: 5px; display: block;';
+            errorSpan.textContent = error;
+            field.parentElement.appendChild(errorSpan);
+        }
+        return false;
+    } else {
+        field.classList.remove('error');
+        if (errorElement) {
+            errorElement.remove();
+        }
+        return true;
+    }
+}
+
+// Проверка всей формы
+function validateForm() {
+    const fields = [
+        { id: 'fullName', validator: validateFullName },
+        { id: 'familyIncome', validator: validateIncome },
+        { id: 'familyMembers', validator: validateFamilyMembers },
+        { id: 'averageGrade', validator: validateAverageGrade }
+    ];
+    
+    let isValid = true;
+    
+    fields.forEach(field => {
+        const element = document.getElementById(field.id);
+        if (!validateField(element, field.validator)) {
+            isValid = false;
+        }
+    });
+    
+    return isValid;
+}
 
 // Показать форму авторизации
 function showLoginForm() {
@@ -39,7 +165,7 @@ function handleLogin(e) {
     
     // Проверка на пустые поля
     if (!username || !password) {
-        alert('Пожалуйста, введите имя пользователя и пароль');
+        showError('Пожалуйста, введите имя пользователя и пароль');
         return;
     }
     
@@ -60,13 +186,13 @@ function handleLogin(e) {
             localStorage.setItem('adminSession', JSON.stringify(currentSession));
             showAdminPanel();
         } else {
-            alert('Ошибка авторизации: ' + data.error);
+            showError('Ошибка авторизации: ' + data.error);
             document.getElementById('password').value = ''; // Очищаем пароль
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
-        alert('Ошибка при авторизации');
+        showError('Ошибка при авторизации');
         document.getElementById('password').value = ''; // Очищаем пароль
     });
 }
@@ -281,7 +407,7 @@ function closeModal() {
 // Проверка авторизации
 function checkAuth() {
     if (!currentSession) {
-        alert('Для выполнения этого действия необходимо авторизоваться');
+        showError('Для выполнения этого действия необходимо авторизоваться');
         showLoginForm();
         return false;
     }
@@ -299,7 +425,7 @@ function handleAccommodation(e) {
     const dormitoryId = document.getElementById('dormitorySelect').value;
     
     if (!dormitoryId) {
-        alert('Пожалуйста, выберите общежитие');
+        showError('Пожалуйста, выберите общежитие');
         return;
     }
     
@@ -315,16 +441,16 @@ function handleAccommodation(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
+            showSuccess(data.message);
             closeModal();
             loadStudents(); // Обновляем список студентов
         } else {
-            alert('Ошибка: ' + data.error);
+            showError('Ошибка: ' + data.error);
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
-        alert('Ошибка при заселении студента');
+        showError('Ошибка при заселении студента');
     });
 }
 
@@ -343,15 +469,15 @@ function evictStudent(studentId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
+            showSuccess(data.message);
             loadStudents(); // Обновляем список студентов
         } else {
-            alert('Ошибка: ' + data.error);
+            showError('Ошибка: ' + data.error);
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
-        alert('Ошибка при выселении студента');
+        showError('Ошибка при выселении студента');
     });
 }
 
@@ -366,12 +492,12 @@ function loadNextCandidate() {
             if (student.id) {
                 openAccommodateModal(student.id);
             } else {
-                alert('Нет кандидатов для заселения');
+                showError('Нет кандидатов для заселения');
             }
         })
         .catch(error => {
             console.error('Ошибка:', error);
-            alert('Ошибка при загрузке кандидата');
+            showError('Ошибка при загрузке кандидата');
         });
 }
 
@@ -382,25 +508,19 @@ function handleApplication(e) {
     // Проверяем авторизацию
     if (!checkAuth()) return;
     
-    const formData = new FormData(e.target);
+    // Валидация формы
+    if (!validateForm()) {
+        showError('Пожалуйста, исправьте ошибки в форме');
+        return;
+    }
+    
     const application = {
-        full_name: document.getElementById('fullName').value,
+        full_name: document.getElementById('fullName').value.trim(),
         family_income: parseFloat(document.getElementById('familyIncome').value),
         family_members: parseInt(document.getElementById('familyMembers').value),
         average_grade: parseFloat(document.getElementById('averageGrade').value),
         social_activity: document.getElementById('socialActivity').checked
     };
-    
-    // Валидация данных
-    if (!application.full_name || !application.family_income || !application.family_members || !application.average_grade) {
-        alert('Пожалуйста, заполните все обязательные поля');
-        return;
-    }
-    
-    if (application.average_grade < 0 || application.average_grade > 10) {
-        alert('Средний балл должен быть в диапазоне от 0 до 10');
-        return;
-    }
     
     fetch('/api/students', {
         method: 'POST',
@@ -412,16 +532,16 @@ function handleApplication(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
+            showSuccess(data.message);
             e.target.reset();
             loadStudents(); // Обновляем список студентов
         } else {
-            alert('Ошибка: ' + data.error);
+            showError('Ошибка: ' + data.error);
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
-        alert('Ошибка при регистрации заявки');
+        showError('Ошибка при регистрации заявки');
     });
 }
 
@@ -437,7 +557,7 @@ function loadFreePlacesReport() {
         })
         .catch(error => {
             console.error('Ошибка:', error);
-            alert('Ошибка при загрузке отчета');
+            showError('Ошибка при загрузке отчета');
         });
 }
 
@@ -453,7 +573,7 @@ function loadQueueReport() {
         })
         .catch(error => {
             console.error('Ошибка:', error);
-            alert('Ошибка при загрузке отчета');
+            showError('Ошибка при загрузке отчета');
         });
 }
 
@@ -469,7 +589,7 @@ function loadAccommodatedReport() {
         })
         .catch(error => {
             console.error('Ошибка:', error);
-            alert('Ошибка при загрузке отчета');
+            showError('Ошибка при загрузке отчета');
         });
 }
 
@@ -777,6 +897,78 @@ function loadExportStats() {
     });
 }
 
+// Показать сообщение об ошибке
+function showError(message) {
+    const notification = document.createElement('div');
+    notification.className = 'notification error';
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: #e74c3c;
+        color: white;
+        border-radius: 5px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        max-width: 400px;
+    `;
+    
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
+    }, 5000);
+}
+
+// Показать сообщение об успехе
+function showSuccess(message) {
+    const notification = document.createElement('div');
+    notification.className = 'notification success';
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: #2ecc71;
+        color: white;
+        border-radius: 5px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        max-width: 400px;
+    `;
+    
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
 // Добавляем стили для анимаций уведомлений
 const style = document.createElement('style');
 style.textContent = `
@@ -800,6 +992,11 @@ style.textContent = `
             transform: translateX(100%);
             opacity: 0;
         }
+    }
+    
+    input.error {
+        border-color: #e74c3c !important;
+        background-color: #fff5f5;
     }
 `;
 document.head.appendChild(style);
