@@ -15,6 +15,28 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Простая сессия
 const sessions = {};
 
+// Функция для проверки авторизации администратора
+function checkAdminAuth(req, res, next) {
+    const sessionId = req.headers['x-session-id'] || req.query.sessionId;
+    
+    if (!sessionId) {
+        return res.status(401).json({ error: 'Требуется авторизация' });
+    }
+    
+    const session = sessions[sessionId];
+    if (!session) {
+        return res.status(401).json({ error: 'Сессия недействительна или истекла' });
+    }
+    
+    if (session.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Доступ запрещен' });
+    }
+    
+    req.session = session;
+    req.user = session.user;
+    next();
+}
+
 // Функция для расчета приоритета студента
 function calculatePriority(student) {
     let priorityScore = 0;
@@ -56,14 +78,56 @@ app.post('/api/login', (req, res) => {
             return res.status(401).json({ error: 'Неверные учетные данные' });
         }
         
-        const sessionId = Math.random().toString(36).substring(2);
-        sessions[sessionId] = { user };
+        const sessionId = Math.random().toString(36).substring(2) + 
+                         Math.random().toString(36).substring(2);
+        sessions[sessionId] = { 
+            user,
+            createdAt: new Date(),
+            lastActivity: new Date()
+        };
+        
+        // Очищаем старые сессии (старше 24 часов)
+        const now = new Date();
+        Object.keys(sessions).forEach(key => {
+            if (now - sessions[key].createdAt > 24 * 60 * 60 * 1000) {
+                delete sessions[key];
+            }
+        });
         
         res.json({ 
             success: true, 
             sessionId,
-            user: { username: user.username, role: user.role }
+            user: { 
+                username: user.username, 
+                role: user.role 
+            }
         });
+    });
+});
+
+// Выход из системы
+app.post('/api/logout', checkAdminAuth, (req, res) => {
+    const sessionId = req.headers['x-session-id'];
+    if (sessionId && sessions[sessionId]) {
+        delete sessions[sessionId];
+    }
+    res.json({ success: true, message: 'Вы вышли из системы' });
+});
+
+// Проверка сессии
+app.get('/api/check-session', (req, res) => {
+    const sessionId = req.headers['x-session-id'] || req.query.sessionId;
+    
+    if (!sessionId || !sessions[sessionId]) {
+        return res.json({ valid: false });
+    }
+    
+    // Обновляем время последней активности
+    sessions[sessionId].lastActivity = new Date();
+    
+    res.json({ 
+        valid: true, 
+        user: sessions[sessionId].user 
     });
 });
 
@@ -156,7 +220,7 @@ app.get('/api/students', (req, res) => {
     });
 });
 
-// Получение списка общежитий
+// Получение списка общежитий (доступно всем)
 app.get('/api/dormitories', (req, res) => {
     db.all("SELECT * FROM dormitories", (err, rows) => {
         if (err) {
@@ -167,8 +231,10 @@ app.get('/api/dormitories', (req, res) => {
     });
 });
 
+// ===== ЗАЩИЩЕННЫЕ ЭНДПОИНТЫ (только для администраторов) =====
+
 // Получение отчета о свободных местах
-app.get('/api/reports/free-places', (req, res) => {
+app.get('/api/reports/free-places', checkAdminAuth, (req, res) => {
     db.all(`
         SELECT 
             d.id,
@@ -189,7 +255,7 @@ app.get('/api/reports/free-places', (req, res) => {
 });
 
 // Получение отчета об очереди - ИСПРАВЛЕННЫЙ
-app.get('/api/reports/queue', (req, res) => {
+app.get('/api/reports/queue', checkAdminAuth, (req, res) => {
     db.all(`
         SELECT 
             s.*,
@@ -234,7 +300,7 @@ app.get('/api/reports/queue', (req, res) => {
 });
 
 // Получение отчета о заселенных студентах
-app.get('/api/reports/accommodated', (req, res) => {
+app.get('/api/reports/accommodated', checkAdminAuth, (req, res) => {
     db.all(`
         SELECT 
             s.id,
@@ -258,7 +324,7 @@ app.get('/api/reports/accommodated', (req, res) => {
 });
 
 // Экспорт отчета в разных форматах
-app.get('/api/export/:reportType/:format', (req, res) => {
+app.get('/api/export/:reportType/:format', checkAdminAuth, (req, res) => {
     const { reportType, format } = req.params;
     let query = '';
     
@@ -1258,8 +1324,8 @@ function generateAllReportsHtml(results) {
     `;
 }
 
-// Регистрация новой заявки
-app.post('/api/students', (req, res) => {
+// Регистрация новой заявки (доступно только админам)
+app.post('/api/students', checkAdminAuth, (req, res) => {
     const { full_name, family_income, family_members, average_grade, social_activity } = req.body;
     
     if (!full_name || !family_income || !family_members || !average_grade) {
@@ -1320,8 +1386,8 @@ app.post('/api/students', (req, res) => {
     });
 });
 
-// Заселение студента
-app.post('/api/students/:id/accommodate', (req, res) => {
+// Заселение студента (доступно только админам)
+app.post('/api/students/:id/accommodate', checkAdminAuth, (req, res) => {
     const studentId = req.params.id;
     const { dormitory_id } = req.body;
     
@@ -1354,8 +1420,8 @@ app.post('/api/students/:id/accommodate', (req, res) => {
     });
 });
 
-// Выселение студента
-app.post('/api/students/:id/evict', (req, res) => {
+// Выселение студента (доступно только админам)
+app.post('/api/students/:id/evict', checkAdminAuth, (req, res) => {
     const studentId = req.params.id;
     
     db.get("SELECT dormitory_id FROM students WHERE id = ?", [studentId], (err, student) => {
@@ -1380,8 +1446,8 @@ app.post('/api/students/:id/evict', (req, res) => {
     });
 });
 
-// Получение следующего кандидата для заселения - ИСПРАВЛЕННЫЙ
-app.get('/api/students/next-candidate', (req, res) => {
+// Получение следующего кандидата для заселения - ИСПРАВЛЕННЫЙ (доступно только админам)
+app.get('/api/students/next-candidate', checkAdminAuth, (req, res) => {
     db.all(`
         SELECT s.*,
                (s.family_income / s.family_members) as income_per_member

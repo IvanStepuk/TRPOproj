@@ -3,7 +3,21 @@ let currentFilter = 'all';
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    showLoginForm();
+    // Проверяем сохраненную сессию при загрузке страницы
+    const savedSession = localStorage.getItem('adminSession');
+    
+    if (savedSession) {
+        try {
+            currentSession = JSON.parse(savedSession);
+            // Проверяем сессию на сервере
+            checkSessionOnServer();
+        } catch (e) {
+            console.error('Ошибка при загрузке сессии:', e);
+            showLoginForm();
+        }
+    } else {
+        showLoginForm();
+    }
     
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     document.getElementById('applicationForm').addEventListener('submit', handleApplication);
@@ -16,6 +30,37 @@ document.addEventListener('DOMContentLoaded', function() {
     
     setupFormValidation();
 });
+
+// Проверка сессии на сервере
+function checkSessionOnServer() {
+    if (!currentSession || !currentSession.sessionId) {
+        showLoginForm();
+        return;
+    }
+    
+    fetch('/api/check-session', {
+        headers: {
+            'X-Session-Id': currentSession.sessionId
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.valid) {
+            showAdminPanel();
+        } else {
+            // Сессия невалидна, показываем форму входа
+            localStorage.removeItem('adminSession');
+            currentSession = null;
+            showLoginForm();
+            showError('Сессия истекла. Пожалуйста, войдите заново.');
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка при проверке сессии:', error);
+        // В случае ошибки сети, все равно показываем админку
+        showAdminPanel();
+    });
+}
 
 // Настройка валидации полей формы
 function setupFormValidation() {
@@ -141,6 +186,10 @@ function showLoginForm() {
     document.getElementById('loginSection').style.display = 'block';
     document.getElementById('adminPanel').style.display = 'none';
     document.getElementById('logoutBtn').style.display = 'none';
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.style.display = 'none';
+    }
 }
 
 // Обработка авторизации
@@ -154,6 +203,12 @@ function handleLogin(e) {
         showError('Пожалуйста, введите имя пользователя и пароль');
         return;
     }
+    
+    // Показываем индикатор загрузки
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Вход...';
+    submitBtn.disabled = true;
     
     fetch('/api/login', {
         method: 'POST',
@@ -171,15 +226,20 @@ function handleLogin(e) {
             };
             localStorage.setItem('adminSession', JSON.stringify(currentSession));
             showAdminPanel();
+            showSuccess('Авторизация успешна!');
         } else {
-            showError('Ошибка авторизации: ' + data.error);
+            showError('Ошибка авторизации: ' + (data.error || 'Неверные учетные данные'));
             document.getElementById('password').value = '';
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
-        showError('Ошибка при авторизации');
+        showError('Ошибка при авторизации. Проверьте подключение к серверу.');
         document.getElementById('password').value = '';
+    })
+    .finally(() => {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
     });
 }
 
@@ -188,6 +248,10 @@ function showAdminPanel() {
     document.getElementById('loginSection').style.display = 'none';
     document.getElementById('adminPanel').style.display = 'block';
     document.getElementById('logoutBtn').style.display = 'block';
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.style.display = 'block';
+    }
     
     document.getElementById('loginForm').reset();
     
@@ -197,9 +261,22 @@ function showAdminPanel() {
 
 // Выход из системы
 function handleLogout() {
+    if (currentSession && currentSession.sessionId) {
+        fetch('/api/logout', {
+            method: 'POST',
+            headers: {
+                'X-Session-Id': currentSession.sessionId
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при выходе:', error);
+        });
+    }
+    
     currentSession = null;
     localStorage.removeItem('adminSession');
     showLoginForm();
+    showSuccess('Вы успешно вышли из системы');
 }
 
 // Переключение между секциями
@@ -239,6 +316,7 @@ function loadStudents() {
         })
         .catch(error => {
             console.error('Ошибка при загрузке студентов:', error);
+            showError('Ошибка при загрузке списка студентов');
         });
 }
 
@@ -339,10 +417,10 @@ function createStudentCard(student) {
             
             <div class="student-actions">
                 ${student.status === 'waiting' ? 
-                    `<button class="btn-accommodate" onclick="openAccommodateModal(${student.id})">
+                    `<button class="btn-accommodate" onclick="openAccommodateModal(${student.id}, '${student.full_name.replace(/'/g, "\\'")}')">
                         <i class="action-icon"></i> Заселить
                     </button>` : 
-                    `<button class="btn-evict" onclick="evictStudent(${student.id})">
+                    `<button class="btn-evict" onclick="evictStudent(${student.id}, '${student.full_name.replace(/'/g, "\\'")}')">
                         <i class="action-icon"></i> Выселить
                     </button>`
                 }
@@ -368,22 +446,48 @@ function loadDormitories() {
 }
 
 // Открытие модального окна для заселения
-function openAccommodateModal(studentId) {
-    if (!checkAuth()) return;
+function openAccommodateModal(studentId, studentName = '') {
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
     document.getElementById('accommodateStudentId').value = studentId;
     document.getElementById('accommodateModal').style.display = 'flex';
+    
+    // Добавляем имя студента в заголовок для наглядности
+    const modalTitle = document.querySelector('#accommodateModal h3');
+    if (modalTitle && studentName) {
+        modalTitle.textContent = `Заселение студента: ${studentName}`;
+    }
+    
     loadDormitories();
 }
 
 // Закрытие модального окна
 function closeModal() {
     document.getElementById('accommodateModal').style.display = 'none';
+    // Восстанавливаем стандартный заголовок
+    const modalTitle = document.querySelector('#accommodateModal h3');
+    if (modalTitle) {
+        modalTitle.textContent = 'Заселение студента';
+    }
 }
 
 // Проверка авторизации
 function checkAuth() {
-    if (!currentSession) {
+    if (!currentSession || !currentSession.sessionId) {
+        // Пробуем загрузить из localStorage
+        const savedSession = localStorage.getItem('adminSession');
+        if (savedSession) {
+            try {
+                currentSession = JSON.parse(savedSession);
+                return true;
+            } catch (e) {
+                console.error('Ошибка при загрузке сессии:', e);
+            }
+        }
+        
         showError('Для выполнения этого действия необходимо авторизоваться');
         showLoginForm();
         return false;
@@ -395,91 +499,168 @@ function checkAuth() {
 function handleAccommodation(e) {
     e.preventDefault();
     
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
     const studentId = document.getElementById('accommodateStudentId').value;
     const dormitoryId = document.getElementById('dormitorySelect').value;
+    
+    if (!studentId) {
+        showError('Ошибка: не указан ID студента');
+        return;
+    }
     
     if (!dormitoryId) {
         showError('Пожалуйста, выберите общежитие');
         return;
     }
     
+    showSuccess('Выполняется заселение студента...');
+    
     fetch(`/api/students/${studentId}/accommodate`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Session-Id': currentSession.sessionId
         },
         body: JSON.stringify({
             dormitory_id: dormitoryId
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                handleSessionExpired();
+                throw new Error('Сессия истекла');
+            }
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
-            showSuccess(data.message);
+            showSuccess(data.message || 'Студент успешно заселен');
             closeModal();
             loadStudents();
         } else {
-            showError('Ошибка: ' + data.error);
+            showError('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
         }
     })
     .catch(error => {
-        console.error('Ошибка:', error);
-        showError('Ошибка при заселении студента');
+        console.error('Ошибка при заселении:', error);
+        showError('Ошибка при заселении студента: ' + error.message);
     });
 }
 
+// Обработка истекшей сессии
+function handleSessionExpired() {
+    localStorage.removeItem('adminSession');
+    currentSession = null;
+    showLoginForm();
+    showError('Сессия истекла. Пожалуйста, войдите заново.');
+}
+
 // Выселение студента
-function evictStudent(studentId) {
-    if (!checkAuth()) return;
-    
-    if (!confirm('Вы уверены, что хотите выселить этого студента?')) {
+function evictStudent(studentId, studentName = '') {
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
         return;
     }
     
+    const confirmMessage = studentName 
+        ? `Вы уверены, что хотите выселить студента "${studentName}"?`
+        : 'Вы уверены, что хотите выселить этого студента?';
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    showSuccess('Выполняется выселение студента...');
+    
     fetch(`/api/students/${studentId}/evict`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+            'X-Session-Id': currentSession.sessionId
+        }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                handleSessionExpired();
+                throw new Error('Сессия истекла');
+            }
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
-            showSuccess(data.message);
+            showSuccess(data.message || 'Студент успешно выселен');
             loadStudents();
         } else {
-            showError('Ошибка: ' + data.error);
+            showError('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
         }
     })
     .catch(error => {
-        console.error('Ошибка:', error);
-        showError('Ошибка при выселении студента');
+        console.error('Ошибка при выселении:', error);
+        showError('Ошибка при выселении студента: ' + error.message);
     });
 }
 
 // Загрузка следующего кандидата для заселения
 function loadNextCandidate() {
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
-    fetch('/api/students/next-candidate')
-        .then(response => response.json())
-        .then(student => {
-            if (student.id) {
-                openAccommodateModal(student.id);
-            } else {
-                showError('Нет кандидатов для заселения');
+    showSuccess('Поиск следующего кандидата...');
+    
+    fetch('/api/students/next-candidate', {
+        headers: {
+            'X-Session-Id': currentSession.sessionId
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                handleSessionExpired();
+                throw new Error('Сессия истекла');
             }
-        })
-        .catch(error => {
-            console.error('Ошибка:', error);
-            showError('Ошибка при загрузке кандидата');
-        });
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(student => {
+        if (student && student.id) {
+            openAccommodateModal(student.id, student.full_name);
+            showSuccess(`Найден кандидат: ${student.full_name}`);
+        } else {
+            showError('Нет кандидатов для заселения');
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        showError('Ошибка при загрузке кандидата: ' + error.message);
+    });
 }
 
 // Обработка регистрации заявки
 function handleApplication(e) {
     e.preventDefault();
     
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
     if (!validateForm()) {
         showError('Пожалуйста, исправьте ошибки в форме');
@@ -494,79 +675,153 @@ function handleApplication(e) {
         social_activity: document.getElementById('socialActivity').checked
     };
     
+    showSuccess('Регистрация заявки...');
+    
     fetch('/api/students', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Session-Id': currentSession.sessionId
         },
         body: JSON.stringify(application)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                handleSessionExpired();
+                throw new Error('Сессия истекла');
+            }
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
-            showSuccess(data.message);
+            showSuccess(data.message || 'Заявка успешно зарегистрирована');
             e.target.reset();
             loadStudents();
         } else {
-            showError('Ошибка: ' + data.error);
+            showError('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
         }
     })
     .catch(error => {
         console.error('Ошибка:', error);
-        showError('Ошибка при регистрации заявки');
+        showError('Ошибка при регистрации заявки: ' + error.message);
     });
 }
 
 // Загрузка отчета о свободных местах
 function loadFreePlacesReport() {
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
-    fetch('/api/reports/free-places')
-        .then(response => response.json())
-        .then(data => {
-            displayReport(data, 'free-places');
-        })
-        .catch(error => {
-            console.error('Ошибка:', error);
-            showError('Ошибка при загрузке отчета');
-        });
+    showSuccess('Загрузка отчета о свободных местах...');
+    
+    fetch('/api/reports/free-places', {
+        headers: {
+            'X-Session-Id': currentSession.sessionId
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                handleSessionExpired();
+                throw new Error('Сессия истекла');
+            }
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        displayReport(data, 'free-places');
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        showError('Ошибка при загрузке отчета: ' + error.message);
+    });
 }
 
 // Загрузка отчета об очереди
 function loadQueueReport() {
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
-    fetch('/api/reports/queue')
-        .then(response => response.json())
-        .then(data => {
-            displayReport(data, 'queue');
-        })
-        .catch(error => {
-            console.error('Ошибка:', error);
-            showError('Ошибка при загрузке отчета');
-        });
+    showSuccess('Загрузка отчета об очереди...');
+    
+    fetch('/api/reports/queue', {
+        headers: {
+            'X-Session-Id': currentSession.sessionId
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                handleSessionExpired();
+                throw new Error('Сессия истекла');
+            }
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        displayReport(data, 'queue');
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        showError('Ошибка при загрузке отчета: ' + error.message);
+    });
 }
 
 // Загрузка отчета о заселенных студентах
 function loadAccommodatedReport() {
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
-    fetch('/api/reports/accommodated')
-        .then(response => response.json())
-        .then(data => {
-            displayReport(data, 'accommodated');
-        })
-        .catch(error => {
-            console.error('Ошибка:', error);
-            showError('Ошибка при загрузке отчета');
-        });
+    showSuccess('Загрузка отчета о заселенных студентах...');
+    
+    fetch('/api/reports/accommodated', {
+        headers: {
+            'X-Session-Id': currentSession.sessionId
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                handleSessionExpired();
+                throw new Error('Сессия истекла');
+            }
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        displayReport(data, 'accommodated');
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        showError('Ошибка при загрузке отчета: ' + error.message);
+    });
 }
 
 // Отображение отчетов
 function displayReport(data, reportType) {
     const container = document.getElementById('reportResults');
     
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
         container.innerHTML = '<p>Данные для отчета отсутствуют</p>';
         return;
     }
@@ -627,7 +882,7 @@ function displayReport(data, reportType) {
                             <tr>
                                 <td>${row.queue_position}</td>
                                 <td>${row.full_name}</td>
-                                <td>${row.income_per_member.toFixed(2)}</td>
+                                <td>${row.income_per_member?.toFixed(2) || '0.00'}</td>
                                 <td>${row.average_grade}</td>
                                 <td>${row.social_activity ? 'Да' : 'Нет'}</td>
                                 <td>${new Date(row.application_date).toLocaleDateString()}</td>
@@ -677,13 +932,16 @@ function displayReport(data, reportType) {
 
 // Экспорт отчета
 function exportReport(reportType, format) {
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
     const displayFormat = format.toUpperCase();
     
     showExportNotification(`Начинается экспорт отчета "${getReportName(reportType)}" в формате ${displayFormat}...`);
     
-    const url = `/api/export/${reportType}/${format}`;
+    const url = `/api/export/${reportType}/${format}?sessionId=${currentSession.sessionId}`;
     
     const a = document.createElement('a');
     a.href = url;
@@ -699,13 +957,16 @@ function exportReport(reportType, format) {
 
 // Экспорт всех отчетов
 function exportAllReports(format) {
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
     const displayFormat = format.toUpperCase();
     
     showExportNotification(`Начинается экспорт всех отчетов в формате ${displayFormat}...`);
     
-    const url = `/api/export/all/${format}`;
+    const url = `/api/export/all/${format}?sessionId=${currentSession.sessionId}`;
     
     const a = document.createElement('a');
     a.href = url;
@@ -730,7 +991,7 @@ function getReportName(reportType) {
     return names[reportType] || reportType;
 }
 
-// Показ уведомления об экспорте
+// Показ уведомления 
 function showExportNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `export-notification ${type}`;
@@ -768,13 +1029,24 @@ function showExportNotification(message, type = 'info') {
 
 // Загрузка статистики для экспорта
 function loadExportStats() {
-    if (!checkAuth()) return;
+    if (!checkAuth()) {
+        showError('Для выполнения этого действия необходимо авторизоваться');
+        return;
+    }
     
     Promise.all([
         fetch('/api/students').then(r => r.json()),
         fetch('/api/dormitories').then(r => r.json()),
-        fetch('/api/reports/queue').then(r => r.json()),
-        fetch('/api/reports/accommodated').then(r => r.json())
+        fetch('/api/reports/queue', {
+            headers: {
+                'X-Session-Id': currentSession.sessionId
+            }
+        }).then(r => r.json()),
+        fetch('/api/reports/accommodated', {
+            headers: {
+                'X-Session-Id': currentSession.sessionId
+            }
+        }).then(r => r.json())
     ])
     .then(([students, dormitories, queue, accommodated]) => {
         const totalStudents = students.length;

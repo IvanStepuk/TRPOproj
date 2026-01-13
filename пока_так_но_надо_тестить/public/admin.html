@@ -11,22 +11,27 @@
         <header>
             <h1>Система распределения студентов <br> Панель администратора</h1>
             <nav>
-                <a align="right" href="/">Публичный доступ</a>
+                <a align="right" href="/">Публичный доступ</a> 
                 <div><p>
 
                     <br>
                 </p></div>
                 <button id="logoutBtn" style="display: none;">Выйти</button>
+                <p><br></p>
+                <!-- <button id="refreshBtn" style="display: none; margin-left: 10px;">Обновить</button> -->
             </nav>
         </header>
 
         <div align="center" id="loginSection" class="login-section">
             <h2>Авторизация</h2>
+            <p style="color: #666; margin-bottom: 20px;">Для доступа к панели администратора введите учетные данные</p>
             <form id="loginForm">
                 <input type="text" id="username" placeholder="Имя пользователя" required>
                 <input type="password" id="password" placeholder="Пароль" required>
                 <button type="submit">Войти</button>
             </form>
+            <p style="margin-top: 15px; color: #999; font-size: 12px;">
+            </p>
         </div>
 
         <div id="adminPanel" class="admin-panel" style="display: none;">
@@ -70,6 +75,7 @@
             <!-- Секция регистрации заявок -->
             <section id="applicationsSection" class="section" style="display: none;">
                 <h2>Регистрация новой заявки</h2>
+                <p style="color: #666; margin-bottom: 20px;">Заполните форму для регистрации нового студента в системе</p>
                 <form id="applicationForm">
                     <div class="form-group">
                         <input type="text" id="fullName" placeholder="ФИО студента" required>
@@ -96,6 +102,7 @@
             <!-- Секция отчетов -->
             <section id="reportsSection" class="section" style="display: none;">
                 <h2>Отчеты</h2>
+                <p style="color: #666; margin-bottom: 20px;">Просмотр и анализ данных системы</p>
                 <div class="report-controls">
                     <button onclick="loadFreePlacesReport()" class="report-btn">
                         <i></i> Свободные места
@@ -115,6 +122,7 @@
             <!-- Секция экспорта данных -->
             <section id="exportSection" class="section" style="display: none;">
                 <h2>Экспорт данных</h2>
+                <p style="color: #666; margin-bottom: 20px;">Экспорт отчетов в различные форматы</p>
                 
                 <!-- Быстрый экспорт всех отчетов -->
                 <div class="quick-export">
@@ -192,8 +200,8 @@
                     </div>
                 </div>
 
-                <!-- Статистика экспорта -->
-                <!-- <div id="exportStats" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                <!-- Статистика системы -->
+                <div id="exportStats" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
                     <h3> Статистика системы</h3>
                     <div id="statsContent">
                         <p>Загружается статистика...</p>
@@ -201,7 +209,7 @@
                 </div>
             </section>
         </div>
-    </div> -->
+    </div>
 
     <!-- Модальное окно для заселения -->
     <div id="accommodateModal" class="modal" style="display: none;">
@@ -226,5 +234,42 @@
     <div> <footer> Боёк Елена, Степук Иван Т-395</footer></div>
 
     <script src="js/admin.js"></script>
+    <script>
+        // Дополнительный скрипт для кнопки обновления
+        document.addEventListener('DOMContentLoaded', function() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', function() {
+                    location.reload();
+                });
+            }
+            
+            // Показываем кнопку обновления в панели администратора
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.style.display = 'none';
+                const refreshBtn = document.getElementById('refreshBtn');
+                if (refreshBtn) {
+                    refreshBtn.style.display = 'none';
+                }
+            }
+        });
+        
+        // Функция для обновления кнопок при показе панели администратора
+        window.showAdminPanel = function() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'block';
+            document.getElementById('logoutBtn').style.display = 'block';
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) {
+                refreshBtn.style.display = 'block';
+            }
+            
+            document.getElementById('loginForm').reset();
+            
+            showSection('students');
+            loadDormitories();
+        };
+    </script>
 </body>
 </html>
